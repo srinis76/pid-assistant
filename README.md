@@ -8,12 +8,12 @@ The P&ID Digital Assistant combines Retrieval Augmented Generation (RAG) with vi
 
 ### Key Features
 
-- ✅ Natural language query interface
-- ✅ Vision-enabled P&ID understanding
-- ✅ Hybrid RAG + Vision API architecture
-- ✅ Multi-LLM provider support (Gemini Flash, GPT-4o mini, Claude Sonnet)
-- ✅ Token usage tracking and cost monitoring
-- ✅ Mock maintenance ticket display
+- Natural language query interface
+- Vision-enabled P&ID understanding
+- Hybrid RAG + Vision API architecture
+- Multi-LLM provider support (Gemini Flash, GPT-4o mini, Claude Sonnet)
+- Token usage tracking and cost monitoring
+- Mock maintenance ticket display
 
 ## Technology Stack
 
@@ -204,7 +204,7 @@ LLM_MODEL=claude-sonnet-4-5-20250929
 
 Restart the application after changing providers.
 
-## Cost Optimization
+## Cost Considerations
 
 ### Default Configuration (Development)
 - **Gemini Flash**: FREE tier (1,500 requests/day)
@@ -218,28 +218,6 @@ Restart the application after changing providers.
 - **Claude Sonnet 4.5**: ~$0.003-0.060 per query
 - **Cost**: ~$3-5 for 50 validation queries
 
-**Total MVP Cost**: $0-7 (vs $15-20 with Sonnet only)
-
-## Token Usage Tracking
-
-Token usage and cost estimates are:
-- Printed to console after each query
-- Logged to `logs/query_log.jsonl`
-- Displayed in Streamlit UI sidebar (if implemented)
-
-Example console output:
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 LLM API Call Complete
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Provider: gemini
-Input Tokens: 1,234
-Output Tokens: 156
-Total Tokens: 1,390
-Response Time: 3.20s
-Estimated Cost: $0.0000
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
 
 ## Development
 
