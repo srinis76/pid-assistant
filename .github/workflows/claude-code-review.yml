@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
       issues: read
       id-token: write
 
@@ -36,9 +36,54 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+          direct_prompt: |
+            You are a senior software architect reviewing a pull request for a P&ID Digital Assistant — a Streamlit AI application that answers natural language queries over engineering diagrams using RAG (ChromaDB + SQLite) and Vision LLMs (Gemini/OpenAI/Claude).
+
+            Core modules: app/main.py (UI), app/rag_engine.py (vector search), app/vision_engine.py (image analysis), app/llm_adapter.py (LLM abstraction), app/query_router.py (RAG vs Vision routing), scripts/ingest_pdfs.py (ingestion pipeline).
+
+            Perform the following analysis on this PR:
+
+            ---
+
+            ## 1. Change Impact Analysis
+            - List every file changed and summarize what was modified (functions added/changed/removed)
+            - For each changed function, trace: who calls it (callers) and what it calls (dependencies)
+            - Identify which of the 3 core flows are affected: RAG path / Vision path / Ingestion pipeline
+            - Flag any shared utilities or adapters touched that could have wide blast radius
+
+            ---
+
+            ## 2. Code Review
+            - Bugs, logic errors, or incorrect assumptions
+            - Security issues: hardcoded secrets, prompt injection risks, unsafe file paths
+            - LLM cost impact: does this change increase token usage or trigger more vision calls?
+            - Consistency with existing patterns (error handling, logging, session state management)
+
+            ---
+
+            ## 3. Test Cases — Prioritized by Risk
+
+            For each test case specify: **Type** | **What to test** | **Input** | **Expected output** | **Risk tier (P0/P1/P2)**
+
+            ### P0 — Must test before merge (breaks core functionality if wrong)
+            - Cover the directly changed code paths
+            - Cover callers of changed functions identified in section 1
+            - Include at least one failure/exception scenario per changed function
+
+            ### P1 — Should test (regression risk to adjacent flows)
+            - Test adjacent modules that share data with changed code
+            - Test the query routing decision if llm_adapter, rag_engine, or vision_engine changed
+            - Test token tracking and cost logging if llm_adapter.py changed
+
+            ### P2 — Good to have (edge cases and performance)
+            - Boundary conditions (empty inputs, very long queries, missing images)
+            - LLM API failure simulation (timeout, rate limit, invalid key)
+            - Cost regression: compare estimated token count before and after change
+
+            ---
+
+            ## 4. Regression Risk Summary
+            - One paragraph: what is the overall risk of this PR and which existing behaviour is most likely to break if this change has a defect?
+
+            Be concrete and specific — reference actual function names, file paths, and query types (RAG/Vision) from this codebase. Do not give generic advice.
 
