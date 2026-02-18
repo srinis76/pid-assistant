@@ -1,5 +1,5 @@
 """
-Query Router for P&ID Digital Assistant
+Query Router for P&ID Assistant
 
 Routes queries to either RAG or Vision engine based on query type.
 Uses simple keyword-based routing for MVP.

@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "description": "RAGAS evaluation dataset for P&ID Digital Assistant",
+    "description": "RAGAS evaluation dataset for P&ID Assistant",
     "document": "Sample P&ID - Gas Processing Facility",
     "created": "2025-01-01",
     "test_cases": 8

@@ -1,4 +1,4 @@
-# P&ID Digital Assistant - System Architecture
+# P&ID Assistant - System Architecture
 
 ## Document Control
 
@@ -12,7 +12,7 @@
 
 ### 1.1 Architecture Overview
 
-The P&ID Digital Assistant is a hybrid AI system combining Retrieval Augmented Generation (RAG) with vision-enabled language models to provide natural language query capabilities over P&ID documents. The architecture is designed for rapid MVP development (3 days) on local hardware (Mac M3) with a clear migration path to cloud production.
+The P&ID Assistant is a hybrid AI system combining Retrieval Augmented Generation (RAG) with vision-enabled language models to provide natural language query capabilities over P&ID documents. The architecture is designed for rapid MVP development (3 days) on local hardware (Mac M3) with a clear migration path to cloud production.
 
 **Core Architecture Pattern**: Hybrid RAG + Vision API with simple rule-based query routing
 

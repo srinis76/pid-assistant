@@ -1,5 +1,5 @@
 """
-Phoenix Tracer for P&ID Digital Assistant
+Phoenix Tracer for P&ID Assistant
 
 Provides OpenTelemetry tracing integration with Arize Phoenix
 for LLM observability and monitoring.

@@ -467,7 +467,7 @@ def main():
     """Main entry point"""
     print()
     print("=" * 60)
-    print("  P&ID Digital Assistant - Vision-Based Ingestion V2")
+    print("  P&ID Assistant - Vision-Based Ingestion V2")
     print("=" * 60)
     print()
 

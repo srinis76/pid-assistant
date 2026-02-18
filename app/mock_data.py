@@ -1,5 +1,5 @@
 """
-Mock ticket data for P&ID Digital Assistant MVP
+Mock ticket data for P&ID Assistant MVP
 Hardcoded maintenance ticket information for demonstration
 """
 from typing import Optional, Dict

@@ -1,5 +1,5 @@
 """
-P&ID Digital Assistant - Main Streamlit UI
+P&ID Assistant - Main Streamlit UI
 
 A conversational AI system for querying P&ID documents.
 """
@@ -22,7 +22,7 @@ from app.mock_data import get_ticket, format_ticket
 
 # Page configuration
 st.set_page_config(
-    page_title="P&ID Digital Assistant",
+    page_title="P&ID Assistant",
     page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -34,7 +34,7 @@ if 'messages' not in st.session_state:
     st.session_state.messages = []
 
 if 'engines_initialized' not in st.session_state:
-    with st.spinner("Initializing P&ID Digital Assistant..."):
+    with st.spinner("Initializing P&ID Assistant..."):
         try:
             st.session_state.rag_engine = RAGEngine()
             st.session_state.vision_engine = VisionEngine()
@@ -184,7 +184,7 @@ with st.sidebar:
 
 
 # Main content
-st.title("P&ID Digital Assistant")
+st.title("P&ID Assistant")
 st.markdown("*Ask questions about your P&ID documents in natural language*")
 
 # Display chat messages
@@ -311,6 +311,6 @@ if prompt := st.chat_input("Ask me about P&IDs...") or st.session_state.get('cur
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray; font-size: 0.8em;'>
-    P&ID Digital Assistant v1.0 MVP | Powered by Gemini Flash, OpenAI, ChromaDB
+    P&ID Assistant v1.0 MVP | Powered by Gemini Flash, OpenAI, ChromaDB
 </div>
 """, unsafe_allow_html=True)

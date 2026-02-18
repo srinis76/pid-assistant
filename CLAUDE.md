@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-The P&ID Digital Assistant is a Streamlit-based AI application that enables natural language queries over Piping and Instrumentation Diagrams (P&IDs) for Oil & Gas operations. It combines hybrid RAG (Retrieval Augmented Generation) with vision-enabled language models to answer both text-based and visual queries about plant equipment and systems.
+The P&ID Assistant is a Streamlit-based AI application that enables natural language queries over Piping and Instrumentation Diagrams (P&IDs) for Oil & Gas operations. It combines hybrid RAG (Retrieval Augmented Generation) with vision-enabled language models to answer both text-based and visual queries about plant equipment and systems.
 
 **Status**: MVP complete and fully operational
 **Tech Stack**: Python 3.11+, Streamlit, ChromaDB, SQLite, Gemini/GPT-4o/Claude APIs

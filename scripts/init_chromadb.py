@@ -1,5 +1,5 @@
 """
-Initialize ChromaDB vector database for P&ID Digital Assistant
+Initialize ChromaDB vector database for P&ID Assistant
 """
 import chromadb
 from pathlib import Path

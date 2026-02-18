@@ -1,5 +1,5 @@
 """
-RAG Engine for P&ID Digital Assistant
+RAG Engine for P&ID Assistant
 
 Retrieves relevant context from vector database and generates answers using LLM.
 """

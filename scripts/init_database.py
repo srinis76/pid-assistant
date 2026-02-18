@@ -1,5 +1,5 @@
 """
-Initialize SQLite database with schema for P&ID Digital Assistant
+Initialize SQLite database with schema for P&ID Assistant
 """
 import sqlite3
 import os

@@ -1,5 +1,5 @@
 """
-RAGAS Evaluation Script for P&ID Digital Assistant
+RAGAS Evaluation Script for P&ID Assistant
 
 Evaluates the RAG pipeline using RAGAS metrics:
 - Faithfulness: Is the answer grounded in the context?
@@ -56,7 +56,7 @@ class RAGASEvaluator:
         self.results = []
 
         print("=" * 60)
-        print("  RAGAS Evaluation for P&ID Digital Assistant")
+        print("  RAGAS Evaluation for P&ID Assistant")
         print("=" * 60)
         print()
 

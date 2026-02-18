@@ -1,5 +1,5 @@
 """
-Data models for P&ID Digital Assistant
+Data models for P&ID Assistant
 
 Pydantic models for type-safe structured data from vision extraction.
 """
