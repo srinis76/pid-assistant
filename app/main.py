@@ -48,7 +48,7 @@ if 'engines_initialized' not in st.session_state:
 # Sidebar
 with st.sidebar:
     # Header
-    st.title("🏭 P&ID Assistant")
+    st.title("P&ID Assistant")
     st.caption("AI-powered P&ID Query System")
 
     # Reduced spacing by 50%
