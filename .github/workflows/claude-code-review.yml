@@ -36,7 +36,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          direct_prompt: |
+          prompt: |
             You are a senior software architect reviewing a pull request for a P&ID Digital Assistant — a Streamlit AI application that answers natural language queries over engineering diagrams using RAG (ChromaDB + SQLite) and Vision LLMs (Gemini/OpenAI/Claude).
 
             Core modules: app/main.py (UI), app/rag_engine.py (vector search), app/vision_engine.py (image analysis), app/llm_adapter.py (LLM abstraction), app/query_router.py (RAG vs Vision routing), scripts/ingest_pdfs.py (ingestion pipeline).
