@@ -184,7 +184,7 @@ with st.sidebar:
 
 
 # Main content
-st.title("🏭 P&ID Digital Assistant")
+st.title("P&ID Digital Assistant")
 st.markdown("*Ask questions about your P&ID documents in natural language*")
 
 # Display chat messages
