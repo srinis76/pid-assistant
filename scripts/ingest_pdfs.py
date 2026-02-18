@@ -1,5 +1,5 @@
 """
-PDF Ingestion Pipeline for P&ID Digital Assistant
+PDF Ingestion Pipeline for P&ID Assistant
 
 This script processes P&ID PDF documents and prepares data for querying:
 1. Extract text from each page
@@ -421,7 +421,7 @@ def main():
     """Main entry point"""
     print()
     print("=" * 60)
-    print("  P&ID Digital Assistant - PDF Ingestion Pipeline")
+    print("  P&ID Assistant - PDF Ingestion Pipeline")
     print("=" * 60)
     print()
 

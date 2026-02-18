@@ -1,10 +1,10 @@
-# P&ID Digital Assistant
+# P&ID Assistant
 
 A conversational AI system that enables natural language queries over Piping and Instrumentation Diagrams (P&IDs) for Oil & Gas operations.
 
 ## Overview
 
-The P&ID Digital Assistant combines Retrieval Augmented Generation (RAG) with vision-enabled language models to provide instant answers about plant assets, equipment, tags, and their interconnections.
+The P&ID Assistant combines Retrieval Augmented Generation (RAG) with vision-enabled language models to provide instant answers about plant assets, equipment, tags, and their interconnections.
 
 ### Key Features
 

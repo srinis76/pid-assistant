@@ -1,8 +1,8 @@
-# P&ID Digital Assistant - RAG System Flow Diagram
+# P&ID Assistant - RAG System Flow Diagram
 
 ## Executive Summary
 
-The P&ID Digital Assistant is an AI-powered system that enables natural language querying of Piping and Instrumentation Diagrams (P&IDs) for Oil & Gas operations. It combines **Retrieval-Augmented Generation (RAG)** for text-based queries with **Vision AI** for visual/spatial queries, providing engineers with instant access to equipment specifications, instrument details, and process flow information.
+The P&ID Assistant is an AI-powered system that enables natural language querying of Piping and Instrumentation Diagrams (P&IDs) for Oil & Gas operations. It combines **Retrieval-Augmented Generation (RAG)** for text-based queries with **Vision AI** for visual/spatial queries, providing engineers with instant access to equipment specifications, instrument details, and process flow information.
 
 The system uses a hybrid architecture with two main pipelines: an **Ingestion Pipeline** that processes PDF documents into searchable embeddings, and a **Query Pipeline** that routes user questions to the appropriate AI engine. Document content is stored in a dual-database architecture—ChromaDB for semantic vector search and SQLite for structured metadata and equipment relationships.
 

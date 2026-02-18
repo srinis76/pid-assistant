@@ -1,5 +1,5 @@
 """
-Vision Engine for P&ID Digital Assistant
+Vision Engine for P&ID Assistant
 
 Processes visual queries using vision-enabled LLMs with P&ID diagram images.
 """

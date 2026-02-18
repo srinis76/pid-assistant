@@ -1,4 +1,4 @@
-# P&ID Digital Assistant - Text Query Demo Guide
+# P&ID Assistant - Text Query Demo Guide
 
 ## Overview
 This guide provides proven demo use cases for the **Text Queries (RAG)** feature only, avoiding vision queries which have accuracy issues.
@@ -263,7 +263,7 @@ Broader questions about the facility:
 ## 🎓 Sample Demo Script
 
 **Intro:**
-> "Let me show you our P&ID Digital Assistant. Instead of manually searching through 6 sheets of P&IDs, you can ask questions in natural language."
+> "Let me show you our P&ID Assistant. Instead of manually searching through 6 sheets of P&IDs, you can ask questions in natural language."
 
 **Demo Query 1:**
 > "What is V-101?"

@@ -1,5 +1,5 @@
 """
-Phoenix Evaluation Script for P&ID Digital Assistant
+Phoenix Evaluation Script for P&ID Assistant
 
 Evaluates the RAG pipeline using Arize Phoenix with:
 - Relevance: Are retrieved chunks relevant to the query?
@@ -64,7 +64,7 @@ class PhoenixEvaluator:
         self.eval_model = None
 
         print("=" * 60)
-        print("  Phoenix Evaluation for P&ID Digital Assistant")
+        print("  Phoenix Evaluation for P&ID Assistant")
         print("=" * 60)
         print()
 

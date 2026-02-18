@@ -1,5 +1,5 @@
 """
-LLM Adapter for P&ID Digital Assistant
+LLM Adapter for P&ID Assistant
 
 Unified interface for multiple LLM providers with token tracking and cost calculation.
 Supports: Gemini Flash, OpenAI (GPT-4o mini), Claude Sonnet

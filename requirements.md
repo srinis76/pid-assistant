@@ -1,4 +1,4 @@
-# P&ID Digital Assistant - Requirements Specification
+# P&ID Assistant - Requirements Specification
 
 ## Document Control
 
@@ -21,7 +21,7 @@
 In Oil & Gas operations, control room engineers, field technicians, and plant managers frequently need to reference Piping and Instrumentation Diagrams (P&IDs) to understand asset configurations, tag details, and system interconnections. Currently, this process is manual — requiring users to consult physical P&ID copies or contact supervisors for clarifications, leading to inefficiency and delays in decision-making.
 
 ### 1.2 Solution Overview
-The P&ID Digital Assistant is a conversational AI system that enables users to interact with P&ID data naturally through text-based queries. It combines vision-enabled language models with structured data retrieval to provide instant answers about plant assets, equipment, tags, and their interconnections.
+The P&ID Assistant is a conversational AI system that enables users to interact with P&ID data naturally through text-based queries. It combines vision-enabled language models with structured data retrieval to provide instant answers about plant assets, equipment, tags, and their interconnections.
 
 ### 1.3 Success Metrics
 - **Query Response Time**: ~5-15 seconds for 90% of queries (vision API dependent)
