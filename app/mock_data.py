@@ -68,24 +68,26 @@ def get_ticket(tag_or_equipment: str) -> Optional[Dict]:
     return MOCK_TICKETS.get(tag_or_equipment.upper())
 
 
-def format_ticket(ticket: Dict) -> str:
+def format_ticket(ticket: Dict) -> Dict:
     """
     Format ticket for display
 
     Returns:
-        Formatted string for UI display
+        Dict with formatted ticket data for rendering
     """
     status_emoji = "✅" if ticket["status"] == "Closed" else "⚠️"
 
-    return f"""
-📋 Last Ticket on {ticket['equipment']}
-Issue: {ticket['issue']}
-Reported: {ticket['reported']}
-Resolution: {ticket['resolution']}
-Resolved: {ticket['resolved']}
-Status: {status_emoji} {ticket['status']}
-Priority: {ticket['priority']}
-    """
+    # Return structured data instead of formatted string
+    return {
+        "equipment": ticket['equipment'],
+        "issue": ticket['issue'],
+        "status": ticket['status'],
+        "status_emoji": status_emoji,
+        "priority": ticket['priority'],
+        "reported": ticket['reported'],
+        "resolved": ticket['resolved'],
+        "resolution": ticket['resolution']
+    }
 
 
 # Test function

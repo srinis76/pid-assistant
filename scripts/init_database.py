@@ -69,6 +69,77 @@ def create_database():
     """)
     print("✓ Created 'mock_tickets' table")
 
+    # Create equipment table (for vision-extracted equipment data)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS equipment (
+            equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL,
+            page_id INTEGER,
+            tag TEXT NOT NULL,
+            equipment_type TEXT,
+            name TEXT,
+            service TEXT,
+            design_pressure TEXT,
+            design_temperature TEXT,
+            operating_pressure TEXT,
+            operating_temperature TEXT,
+            capacity TEXT,
+            size TEXT,
+            material TEXT,
+            specs_json TEXT,
+            FOREIGN KEY (document_id) REFERENCES documents(document_id),
+            FOREIGN KEY (page_id) REFERENCES document_pages(page_id)
+        )
+    """)
+    print("✓ Created 'equipment' table")
+
+    # Create instruments table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS instruments (
+            instrument_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL,
+            page_id INTEGER,
+            tag TEXT NOT NULL,
+            instrument_type TEXT,
+            function TEXT,
+            setpoint TEXT,
+            range_min TEXT,
+            range_max TEXT,
+            FOREIGN KEY (document_id) REFERENCES documents(document_id),
+            FOREIGN KEY (page_id) REFERENCES document_pages(page_id)
+        )
+    """)
+    print("✓ Created 'instruments' table")
+
+    # Create equipment_instruments relationship table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS equipment_instruments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            equipment_id INTEGER NOT NULL,
+            instrument_id INTEGER NOT NULL,
+            relationship_type TEXT,
+            FOREIGN KEY (equipment_id) REFERENCES equipment(equipment_id),
+            FOREIGN KEY (instrument_id) REFERENCES instruments(instrument_id)
+        )
+    """)
+    print("✓ Created 'equipment_instruments' table")
+
+    # Create connections table (piping between equipment)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS connections (
+            connection_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL,
+            source_tag TEXT NOT NULL,
+            destination_tag TEXT NOT NULL,
+            line_number TEXT,
+            pipe_size TEXT,
+            pipe_class TEXT,
+            service TEXT,
+            FOREIGN KEY (document_id) REFERENCES documents(document_id)
+        )
+    """)
+    print("✓ Created 'connections' table")
+
     # Create indexes for performance
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_pages_document
@@ -81,6 +152,37 @@ def create_database():
         ON document_pages(has_equipment)
     """)
     print("✓ Created index on has_equipment")
+
+    # Indexes for equipment-related tables
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equipment_tag
+        ON equipment(tag)
+    """)
+    print("✓ Created index on equipment.tag")
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equipment_document
+        ON equipment(document_id)
+    """)
+    print("✓ Created index on equipment.document_id")
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_instruments_tag
+        ON instruments(tag)
+    """)
+    print("✓ Created index on instruments.tag")
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_connections_source
+        ON connections(source_tag)
+    """)
+    print("✓ Created index on connections.source_tag")
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_connections_dest
+        ON connections(destination_tag)
+    """)
+    print("✓ Created index on connections.destination_tag")
 
     # Insert mock ticket data
     mock_tickets = [
@@ -111,8 +213,8 @@ def create_database():
     # Commit changes
     conn.commit()
     print(f"\n✓ Database created successfully at: {db_path}")
-    print(f"  - 3 tables created")
-    print(f"  - 2 indexes created")
+    print(f"  - 7 tables created (documents, document_pages, mock_tickets, equipment, instruments, equipment_instruments, connections)")
+    print(f"  - 7 indexes created")
     print(f"  - {len(mock_tickets)} mock tickets inserted")
 
     # Close connection

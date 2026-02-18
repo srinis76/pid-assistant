@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "description": "RAGAS evaluation dataset for P&ID Digital Assistant",
+    "document": "Sample P&ID - Gas Processing Facility",
+    "created": "2025-01-01",
+    "test_cases": 8
+  },
+  "test_cases": [
+    {
+      "id": 1,
+      "question": "What is V-101?",
+      "ground_truth": "V-101 is the High Pressure Separator, a horizontal vessel used for separating gas from liquids in the gas processing facility.",
+      "expected_context": ["V-101", "High Pressure Separator", "vessel"],
+      "category": "equipment_identification"
+    },
+    {
+      "id": 2,
+      "question": "What is the design pressure of V-101?",
+      "ground_truth": "The design pressure of V-101 is 1200 PSIG at 300°F.",
+      "expected_context": ["V-101", "design pressure", "1200 PSIG", "300°F"],
+      "category": "specifications"
+    },
+    {
+      "id": 3,
+      "question": "What instruments are associated with V-101?",
+      "ground_truth": "V-101 has the following instruments: PSV-101 (Pressure Safety Valve), PT-101A/B/C/D (Pressure Transmitters), LT-101A/B (Level Transmitters), LIC-101A (Level Controller), and SDV-101 (Shutdown Valve).",
+      "expected_context": ["V-101", "PSV-101", "PT-101", "LT-101", "LIC-101"],
+      "category": "equipment_instruments"
+    },
+    {
+      "id": 4,
+      "question": "What is the function of PSV-101?",
+      "ground_truth": "PSV-101 is a Pressure Safety Valve that provides overpressure protection for V-101 (High Pressure Separator).",
+      "expected_context": ["PSV-101", "Pressure Safety Valve", "overpressure", "protection"],
+      "category": "instrument_function"
+    },
+    {
+      "id": 5,
+      "question": "What equipment is downstream of V-101?",
+      "ground_truth": "Downstream of V-101: the gas outlet goes to C-104 (Gas Compressor) and the liquid outlet goes to V-102 (Low Pressure Separator).",
+      "expected_context": ["V-101", "V-102", "C-104", "downstream", "outlet"],
+      "category": "process_flow"
+    },
+    {
+      "id": 6,
+      "question": "What is C-104?",
+      "ground_truth": "C-104 is the Gas Compressor that receives gas from the High Pressure Separator (V-101) for compression.",
+      "expected_context": ["C-104", "Gas Compressor", "compressor"],
+      "category": "equipment_identification"
+    },
+    {
+      "id": 7,
+      "question": "What is the operating pressure of V-101?",
+      "ground_truth": "The operating pressure of V-101 is 350 PSIG at 70°F.",
+      "expected_context": ["V-101", "operating pressure", "350 PSIG", "70°F"],
+      "category": "specifications"
+    },
+    {
+      "id": 8,
+      "question": "What is V-102 and what is its purpose?",
+      "ground_truth": "V-102 is the Low Pressure Separator that receives liquid from V-101 (High Pressure Separator) for further separation at lower pressure.",
+      "expected_context": ["V-102", "Low Pressure Separator", "separator"],
+      "category": "equipment_identification"
+    }
+  ]
+}

@@ -12,10 +12,17 @@ from dotenv import load_dotenv
 
 try:
     from app.llm_adapter import LLMAdapter
+    from app.phoenix_tracer import init_tracing
 except ModuleNotFoundError:
     from llm_adapter import LLMAdapter
+    from phoenix_tracer import init_tracing
 
 load_dotenv()
+
+# Initialize Phoenix tracing if enabled
+_ENABLE_TRACING = os.getenv("ENABLE_PHOENIX_TRACING", "false").lower() == "true"
+if _ENABLE_TRACING:
+    init_tracing(project_name="pid-assistant")
 
 
 class RAGEngine:

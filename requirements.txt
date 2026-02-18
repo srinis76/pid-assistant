@@ -19,3 +19,11 @@ pydantic>=2.0.0
 
 # Development
 pytest>=7.0.0
+
+# Evaluation
+ragas>=0.1.0
+datasets>=2.14.0
+
+# Phoenix Observability
+arize-phoenix>=4.0.0
+openinference-instrumentation-openai>=0.1.0

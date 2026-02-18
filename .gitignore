@@ -35,3 +35,13 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# readme file
+SETUP_STATUS.md
+
+# Binary and generated files
+*.pdf
+*.pptx
+*.log
+data/pdfs/
+results/

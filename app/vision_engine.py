@@ -39,31 +39,66 @@ class VisionEngine:
         """
         Determine which P&ID pages to send to vision API
 
-        For MVP: Simple heuristics
-        - Search for equipment mentions in query (V-101, P-103, etc.)
-        - Look up which pages contain that equipment
-        - Or default to sending all equipment pages
+        Enhanced logic:
+        - Extract equipment tags from query (V-101, C-104, PSV-101, etc.)
+        - Search page text content for those tags
+        - Return only pages containing the mentioned equipment
+        - Fallback to equipment pages if no matches
 
         Returns:
             List of image file paths
         """
+        import re
+
         conn = sqlite3.connect(self.sqlite_db_path)
         cursor = conn.cursor()
 
-        # For MVP: Get all pages with equipment
-        cursor.execute("""
-            SELECT image_path, page_number, page_title
-            FROM document_pages
-            WHERE has_equipment = 1
-            ORDER BY page_number
-            LIMIT ?
-        """, (max_pages,))
+        # Extract equipment tags from query (pattern: Letter(s)-Number(s) with optional letter)
+        # Examples: V-101, C-104, PSV-101, FT-103A
+        tag_pattern = r'\b[A-Z]+-\d+[A-Z]?\b'
+        equipment_tags = re.findall(tag_pattern, query.upper())
 
-        pages = cursor.fetchall()
+        relevant_pages = []
+
+        if equipment_tags:
+            print(f"   🔍 Found equipment tags in query: {equipment_tags}")
+
+            # Search for pages containing ANY of the mentioned tags
+            for tag in equipment_tags:
+                cursor.execute("""
+                    SELECT DISTINCT image_path, page_number, page_title
+                    FROM document_pages
+                    WHERE text_content LIKE ? AND has_equipment = 1
+                    ORDER BY page_number
+                """, (f'%{tag}%',))
+
+                tag_pages = cursor.fetchall()
+                for page in tag_pages:
+                    if page not in relevant_pages:
+                        relevant_pages.append(page)
+
+        # If we found relevant pages, use those
+        if relevant_pages:
+            print(f"   ✓ Found {len(relevant_pages)} page(s) containing the equipment")
+            # Limit to max_pages
+            relevant_pages = relevant_pages[:max_pages]
+        else:
+            # Fallback: Get first few equipment pages
+            print(f"   ℹ️  No specific equipment found, using default pages")
+            cursor.execute("""
+                SELECT image_path, page_number, page_title
+                FROM document_pages
+                WHERE has_equipment = 1
+                ORDER BY page_number
+                LIMIT ?
+            """, (max_pages,))
+            relevant_pages = cursor.fetchall()
+
         conn.close()
 
-        if not pages:
-            # Fallback: get any pages
+        if not relevant_pages:
+            # Final fallback: get any pages
+            conn = sqlite3.connect(self.sqlite_db_path)
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT image_path, page_number, page_title
@@ -71,11 +106,11 @@ class VisionEngine:
                 ORDER BY page_number
                 LIMIT ?
             """, (max_pages,))
-            pages = cursor.fetchall()
+            relevant_pages = cursor.fetchall()
             conn.close()
 
         # Extract image paths
-        image_paths = [page[0] for page in pages]
+        image_paths = [page[0] for page in relevant_pages]
 
         return image_paths
 
@@ -137,18 +172,42 @@ class VisionEngine:
         if not images:
             return "Error loading P&ID images.", {}
 
-        # 3. Build vision prompt
-        prompt = f"""You are analyzing P&ID (Piping and Instrumentation Diagram) documents for an oil and gas facility.
+        # 3. Build enhanced vision prompt
+        prompt = f"""You are an expert P&ID (Piping and Instrumentation Diagram) analyst for oil and gas facilities.
 
 User question: {query}
 
-Instructions:
-- Examine the P&ID diagram(s) provided carefully
-- Identify equipment, instruments, valves, and piping shown in the diagrams
-- Answer the question based on what you can see in the diagrams
-- Be specific about locations, connections, and equipment identifiers (tags)
-- If you cannot find relevant information in the diagrams, say so
-- Use technical terminology appropriate for P&IDs
+⚠️ CRITICAL ANTI-HALLUCINATION INSTRUCTIONS ⚠️
+
+1. **ONLY report what you can ACTUALLY READ in the diagrams**
+   - If you cannot read a tag number clearly, DO NOT guess or invent one
+   - DO NOT assume standard naming conventions or infer tags
+   - DO NOT use examples like "FI-101" unless you can LITERALLY see those exact characters
+
+2. **When identifying equipment**:
+   - State the EXACT tag as written on the diagram (e.g., "V-101", "C-104", "PSV-101")
+   - If a tag is blurry or not visible, say "equipment tag not clearly visible" or "untagged equipment"
+   - NEVER fabricate tag numbers based on equipment type
+
+3. **For counting equipment** (e.g., "how many orifice meters"):
+   - Count ONLY equipment you can clearly identify visually
+   - Describe their location (e.g., "on the left side of the diagram", "between V-101 and C-104")
+   - If tags are readable, include them. If not readable, say "tag not visible"
+   - If unsure whether something is the requested equipment type, state your uncertainty
+
+4. **Verification requirement**:
+   - Before mentioning ANY equipment tag, mentally verify: "Can I actually SEE this exact text in the image?"
+   - If the answer is no, do not include that tag
+
+5. **For flow path questions**:
+   - Only trace connections you can actually see
+   - Use descriptive references if tags aren't visible (e.g., "the separator on the left" instead of inventing a tag)
+
+6. **If you cannot answer confidently**, say:
+   "I cannot clearly identify [item] in the provided diagrams" or
+   "The resolution/visibility does not allow me to read the tag numbers clearly"
+
+Remember: It is BETTER to say "tag not visible" than to invent a plausible-sounding but incorrect tag number.
 
 Answer:"""
 

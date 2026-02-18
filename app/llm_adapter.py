@@ -147,6 +147,80 @@ class LLMAdapter:
 
         return response.text, tokens
 
+    def _call_gemini_json(
+        self,
+        prompt: str,
+        images: Optional[List[str]]
+    ) -> Tuple[str, Dict]:
+        """Call Gemini API with JSON response format"""
+        import PIL.Image
+        import io
+        import base64
+
+        # Prepare content
+        content = []
+        if images:
+            for img_b64 in images:
+                img_bytes = base64.b64decode(img_b64)
+                img = PIL.Image.open(io.BytesIO(img_bytes))
+                content.append(img)
+        content.append(prompt)
+
+        # Configure for JSON output
+        generation_config = genai.GenerationConfig(
+            response_mime_type="application/json",
+            temperature=0.1,
+        )
+
+        # Generate response
+        response = self.gemini_model.generate_content(
+            content,
+            generation_config=generation_config
+        )
+
+        # Extract token usage
+        tokens = {
+            "input_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
+            "output_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
+            "total_tokens": getattr(response.usage_metadata, "total_token_count", 0)
+        }
+
+        return response.text, tokens
+
+    def call_llm_json(
+        self,
+        prompt: str,
+        images: Optional[List[str]] = None,
+        query_type: str = "extraction"
+    ) -> str:
+        """
+        Call LLM with JSON output mode for structured extraction.
+
+        Args:
+            prompt: Extraction prompt
+            images: Optional list of base64-encoded images
+            query_type: Type of query for tracking
+
+        Returns:
+            JSON response string
+        """
+        start_time = time.time()
+
+        if self.provider == "gemini":
+            response, tokens = self._call_gemini_json(prompt, images)
+        else:
+            # Fall back to regular call for other providers
+            response, tokens = self._call_gemini(prompt, images) if self.provider == "gemini" else (None, {})
+            if response is None:
+                raise ValueError(f"JSON mode not supported for provider: {self.provider}")
+
+        elapsed = time.time() - start_time
+
+        if self.enable_tracking:
+            self._log_usage(tokens, elapsed, query_type)
+
+        return response
+
     def _call_openai(
         self,
         prompt: str,
