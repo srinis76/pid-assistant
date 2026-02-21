@@ -405,3 +405,143 @@ Collection: "pid_chunks"
 │                     PyMuPDF                                 │
 └────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Model Evaluation & Fine-Tuning Learnings
+
+This section documents key engineering insights from systematically evaluating and
+improving the vision-based ingestion pipeline. These learnings apply broadly to any
+system that uses LLMs for structured data extraction from complex visual documents.
+
+---
+
+### 1. Establish a Measurable Baseline Before Changing Models
+
+**The Problem:** Intuition about which model is "better" is unreliable for structured
+extraction tasks. A more capable model does not automatically produce better structured
+output — it depends on how the schema, prompt, and validation layer interact.
+
+**The Approach:** Before evaluating any new model, define a ground truth file and an
+automated evaluation script that measures extraction quality directly from the output
+store (SQLite in this case). This creates a repeatable, objective benchmark independent
+of human judgment.
+
+**Key Metrics (Level 1 — Ingestion Quality):**
+- **Tag Recall:** fraction of expected equipment/instrument tags extracted
+- **Field Coverage:** percentage of records with non-null spec fields (design pressure, temperature)
+- **Instrument-Equipment Mapping Rate:** fraction of instruments correctly linked to parent equipment
+- **Connection Count:** number of piping connections extracted, including cross-page references
+
+**Why this matters in interviews:** Demonstrates ability to apply engineering rigor to
+AI system evaluation — treating LLM output quality as a measurable engineering metric
+rather than a subjective assessment.
+
+---
+
+### 2. Schema Contract Strictness Reveals Model Honesty
+
+**The Problem:** When integrating a stricter schema validation layer (Pydantic v2) with
+a more capable vision model, the system initially scored *lower* — not because extraction
+quality degraded, but because the more capable model was *more honest*.
+
+**The Root Cause:** Capable models return explicit `null` for fields they cannot read
+with confidence, rather than hallucinating plausible values. A strict `str` type in Pydantic
+v2 rejects explicit `null` even when a default is provided — the distinction between an
+*absent* field and an explicitly *null* field. This caused entire pages to be silently
+dropped when any single field in a record returned null.
+
+**The Fix:** Two-layer solution:
+1. **Field-level:** Use `Optional[str]` with `field_validator(mode="before")` to coerce
+   `None → ""` for non-identifying string fields. Use `Optional[str]` without coercion
+   for fields where null is semantically meaningful (e.g., spec values).
+2. **Record-level:** Use `model_validator(mode="before")` to sanitize entire response
+   structures — coercing unexpected dict responses to empty lists, filtering records where
+   identifying keys (tag, symbol_code) are null before they reach Pydantic.
+
+**Quantified Impact:** The same model (gemini-2.5-pro) scored 77.0 before fixes and
+87.6 after — a 10.6-point improvement with zero model changes. The model was correct
+all along; the schema was the problem.
+
+**Why this matters in interviews:** Illustrates the importance of distinguishing between
+*model quality* and *integration quality*. A poorly designed schema contract can make an
+accurate model appear unreliable.
+
+---
+
+### 3. Prompt Instructions Must Be Spatially and Behaviorally Specific
+
+**The Problem:** Generic extraction instructions ("include piping connections") produce
+inconsistent results for spatially complex diagrams. The model correctly extracts
+connections visible within a page boundary but silently omits connections that cross
+page boundaries — because the instruction does not address that case.
+
+**The Insight:** P&ID diagrams are inherently multi-page documents where process flow
+lines are truncated at page edges and continue on referenced sheets. A model following
+a generic instruction will stop at the visual boundary of the image. An instruction must
+explicitly describe the *edge case behavior* to handle it correctly.
+
+**The Fix:** Replace "include piping connections" with a behaviorally explicit instruction:
+*"Trace ALL piping lines including those that exit the page boundary. For off-page lines,
+record the destination as the label on the line (e.g., 'TO V-102'). Never omit a
+connection because the destination is on another sheet."*
+
+**Quantified Impact:** Cross-page connection extraction improved by 28% (39 → 50
+connections) with this single instruction change.
+
+**Why this matters in interviews:** Demonstrates understanding that prompt engineering
+for structured extraction is not about verbosity — it is about precisely specifying
+boundary conditions and edge case behavior, the same discipline as writing good
+unit test cases.
+
+---
+
+### 4. Prompt Changes Have Non-Obvious Trade-offs — Measure, Don't Assume
+
+**The Problem:** Adding more instructions to a prompt does not uniformly improve output.
+Each instruction competes for the model's attention and can shift its behavior in
+unexpected ways — improving one metric while regressing another.
+
+**Observed Trade-off:** Adding instructions for cross-page connection tracing improved
+connection count (+28%) but reduced equipment tag recall (-15%). The model became more
+focused on tracing lines and less thorough in cataloguing all equipment tags.
+
+**The Approach:** Treat prompt changes like code changes — test one instruction at a
+time against a fixed evaluation suite before combining. Discard instructions that degrade
+overall score even if they improve a specific metric.
+
+**Why this matters in interviews:** Reflects a disciplined, data-driven approach to
+prompt engineering rather than iterating by feel. The same principle applies to any
+hyperparameter tuning in ML: change one variable, measure the effect, then decide.
+
+---
+
+### 5. Cost-Performance Trade-off Must Be Empirically Measured
+
+**The Problem:** Model tiers (flash vs. pro) carry an implicit assumption that higher
+tier = better results. For structured extraction tasks, this assumption is unreliable
+because quality depends on the interaction between model capability, schema design,
+and prompt specificity — not model tier alone.
+
+**Empirical Result:**
+
+| Configuration | Overall Score | Instrument Mapping | Cost Ratio |
+|---|---|---|---|
+| flash-lite (baseline) | 90.2 | 85.5% | 1x |
+| pro (all fixes applied) | 87.6 | 100% | ~33x |
+
+Pro achieved 100% instrument-equipment mapping — a genuine quality advantage for
+relationship extraction. But on overall structured extraction completeness, flash-lite
+remained ahead. The 2.6-point gap does not justify a 33x cost increase for the current
+use case.
+
+**The Principle:** Identify which specific metrics matter most for the downstream
+application, then select the model that maximises those metrics at acceptable cost —
+not the model with the highest general benchmark.
+
+**Why this matters in interviews:** Shows awareness of production economics in AI
+systems and the ability to make data-driven build vs. buy decisions at the model level.
+
+
+The five topics cover: evaluation-first discipline, schema contract vs. model honesty, spatially-specific prompt instructions, prompt trade-off measurement, and
+cost-performance empiricism. 
