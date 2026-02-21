@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Workflow — CRITICAL CONSTRAINT
+
+**NEVER commit directly to `main`.** All changes must go through a pull request:
+
+1. Create a branch: `git checkout -b claude/<short-description>`
+2. Make changes and commit to the branch
+3. Push branch: `git push origin <branch-name>`
+4. Raise a PR: `gh pr create --base main --head <branch-name> ...`
+
+This applies to ALL changes — bug fixes, new files, documentation updates, everything.
+The only exception is if the user explicitly says "commit directly to main".
+
 ## Project Overview
 
 The P&ID Assistant is a Streamlit-based AI application that enables natural language queries over Piping and Instrumentation Diagrams (P&IDs) for Oil & Gas operations. It combines hybrid RAG (Retrieval Augmented Generation) with vision-enabled language models to answer both text-based and visual queries about plant equipment and systems.
