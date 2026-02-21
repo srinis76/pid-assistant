@@ -6,7 +6,7 @@ using vision-based extraction.
 """
 
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field
 
 
 # ============================================================
@@ -19,11 +19,6 @@ class Equipment(BaseModel):
     tag: str = Field(..., description="Equipment tag number (e.g., V-101)")
     equipment_type: str = Field(default="", description="Type (Separator, Pump, Compressor, etc.)")
     name: str = Field(default="", description="Equipment name/description")
-
-    @field_validator("name", "equipment_type", mode="before")
-    @classmethod
-    def coerce_none_to_empty_str(cls, v):
-        return v if v is not None else ""
     service: Optional[str] = Field(default=None, description="Service description")
 
     # Design conditions
@@ -51,11 +46,6 @@ class Instrument(BaseModel):
     function: str = Field(default="", description="Function (measurement, control, protection)")
     parent_equipment: Optional[str] = Field(default=None, description="Tag of equipment this instrument belongs to")
 
-    @field_validator("instrument_type", "function", "relationship_type", mode="before")
-    @classmethod
-    def coerce_none_to_empty_str(cls, v):
-        return v if v is not None else ""
-
     # Setpoint and range
     setpoint: Optional[str] = Field(default=None, description="Setpoint value with units")
     range_min: Optional[str] = Field(default=None, description="Minimum range")
@@ -71,8 +61,8 @@ class Instrument(BaseModel):
 class Connection(BaseModel):
     """Piping connection between equipment"""
 
-    source_tag: Optional[str] = Field(default=None, description="Source equipment tag")
-    destination_tag: Optional[str] = Field(default=None, description="Destination equipment tag")
+    source_tag: str = Field(..., description="Source equipment tag")
+    destination_tag: str = Field(..., description="Destination equipment tag")
     line_number: Optional[str] = Field(default=None, description="Line number (e.g., 4-P-101-A1A)")
     pipe_size: Optional[str] = Field(default=None, description="Pipe size (e.g., 4 inch, 6\"-D)")
     pipe_class: Optional[str] = Field(default=None, description="Piping class (e.g., A, B, D)")
@@ -125,19 +115,9 @@ class PFDExtraction(BaseModel):
 
     # Stream data table (if present)
     stream_table_headers: List[str] = Field(default_factory=list)
-    stream_table_data: List[Dict[str, Optional[str]]] = Field(default_factory=list)
+    stream_table_data: List[Dict[str, str]] = Field(default_factory=list)
 
     notes: List[str] = Field(default_factory=list)
-
-    @model_validator(mode="before")
-    @classmethod
-    def ensure_lists(cls, data):
-        """Coerce any list field that Gemini returned as a dict/null to an empty list."""
-        for field in ("major_equipment", "process_streams", "stream_table_headers",
-                      "stream_table_data", "notes"):
-            if not isinstance(data.get(field), list):
-                data[field] = []
-        return data
 
 
 # ============================================================
@@ -147,20 +127,15 @@ class PFDExtraction(BaseModel):
 class InstrumentSymbol(BaseModel):
     """Instrument symbol definition from legend"""
 
-    symbol_code: Optional[str] = Field(default=None, description="Symbol code (e.g., PT, LT, PSV)")
+    symbol_code: str = Field(..., description="Symbol code (e.g., PT, LT, PSV)")
     description: str = Field(default="")
     category: Optional[str] = Field(default=None, description="Category: Pressure, Level, Flow, etc.")
-
-    @field_validator("description", mode="before")
-    @classmethod
-    def coerce_none_to_empty_str(cls, v):
-        return v if v is not None else ""
 
 
 class PipingClass(BaseModel):
     """Piping class specification from legend"""
 
-    class_code: Optional[str] = Field(default=None, description="Class code (e.g., A, B, D)")
+    class_code: str = Field(..., description="Class code (e.g., A, B, D)")
     description: Optional[str] = Field(default=None)
     material: Optional[str] = Field(default=None)
     pressure_rating: Optional[str] = Field(default=None)
@@ -178,26 +153,6 @@ class LegendExtraction(BaseModel):
     line_types: List[Dict[str, str]] = Field(default_factory=list)
 
     general_notes: List[str] = Field(default_factory=list)
-
-    @model_validator(mode="before")
-    @classmethod
-    def ensure_lists(cls, data):
-        """Coerce any list field that Gemini returned as a dict/null to an empty list."""
-        for field in ("instrument_symbols", "piping_classes", "valve_symbols",
-                      "line_types", "general_notes"):
-            if not isinstance(data.get(field), list):
-                data[field] = []
-        # Drop InstrumentSymbol entries with null symbol_code
-        data["instrument_symbols"] = [
-            s for s in data.get("instrument_symbols", [])
-            if isinstance(s, dict) and s.get("symbol_code")
-        ]
-        # Drop PipingClass entries with null class_code
-        data["piping_classes"] = [
-            p for p in data.get("piping_classes", [])
-            if isinstance(p, dict) and p.get("class_code")
-        ]
-        return data
 
 
 # ============================================================
@@ -230,16 +185,6 @@ class PIDExtraction(BaseModel):
     # Extraction metadata
     extraction_status: str = Field(default="success")
     extraction_notes: List[str] = Field(default_factory=list)
-
-    @model_validator(mode="before")
-    @classmethod
-    def ensure_lists(cls, data):
-        """Coerce any list field that Gemini returned as a dict/null to an empty list."""
-        for field in ("primary_equipment", "instruments", "piping_connections",
-                      "control_loops", "sheet_references", "extraction_notes"):
-            if not isinstance(data.get(field), list):
-                data[field] = []
-        return data
 
 
 # ============================================================

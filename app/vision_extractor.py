@@ -215,14 +215,6 @@ CRITICAL INSTRUCTIONS:
 5. Include piping connections with sizes (e.g., 6"-D means 6 inch, class D)
 6. Note sheet references (SHT 2, SHT 3, etc.)
 7. If a tag is not clearly readable, use "TAG_NOT_VISIBLE" as the tag value
-8. CROSS-PAGE CONNECTIONS - trace ALL piping lines including those that exit the page
-   boundary. For lines going off-page, set destination_tag to the equipment or header the
-   line is labelled as going to (e.g., "TO V-102", "FROM PRODUCTION HEADER"). Never omit
-   a connection just because the destination is on another sheet.
-9. PARENT EQUIPMENT - every instrument must have a parent_equipment value. Assign it based
-   on: (a) the signal line connecting the instrument to equipment, (b) the equipment bubble
-   cluster the instrument appears inside, or (c) the equipment data table the instrument is
-   listed under. If genuinely ambiguous, assign the nearest major equipment tag on the page.
 
 Return ONLY the JSON object, no markdown formatting or explanation."""
 
@@ -446,12 +438,7 @@ class VisionExtractor:
         # From P&ID pages: collect instruments and connections
         for pid in pid_pages:
             all_instruments.extend(pid.instruments)
-            # Skip connections where source or destination is null
-            valid_connections = [
-                c for c in pid.piping_connections
-                if c.source_tag and c.destination_tag
-            ]
-            all_connections.extend(valid_connections)
+            all_connections.extend(pid.piping_connections)
 
             # Build equipment-instrument map
             for inst in pid.instruments:
