@@ -1,0 +1,192 @@
+{
+  "metadata": {
+    "description": "Verified retrieval evaluation dataset for Top-K Retrieval Accuracy measurement",
+    "document": "D-254-001 Gas Production Facility Rev1",
+    "verified_from": "P&ID source pages (page_1.png through page_7.png) + ChromaDB chunk inspection",
+    "created": "2026-02-21",
+    "total_questions": 20,
+    "methodology": "Gold chunk = chunk that must appear in top-K for the question to be answerable. answer_in_chunk flags whether the answer actually exists in the chunk (retrieval correct != always answerable due to extraction gaps)."
+  },
+  "questions": [
+    {
+      "id": 1,
+      "question": "What is the design pressure of V-101?",
+      "ground_truth": "1200 PSIG (82.7 BAR)/FV",
+      "gold_chunk_ids": ["v2_equip_V-101"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 3 (V-101 spec block) and chunk content"
+    },
+    {
+      "id": 2,
+      "question": "What is the operating temperature of V-101?",
+      "ground_truth": "70°F (21°C)",
+      "gold_chunk_ids": ["v2_equip_V-101"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 3 spec block"
+    },
+    {
+      "id": 3,
+      "question": "What is the design pressure of V-102?",
+      "ground_truth": "75 PSIG (5.2 BAR)/FV",
+      "gold_chunk_ids": ["v2_equip_V-102"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 4 spec block"
+    },
+    {
+      "id": 4,
+      "question": "What is the operating pressure of V-102?",
+      "ground_truth": "50 PSIG (3.5 BAR)",
+      "gold_chunk_ids": ["v2_equip_V-102"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 4 spec block"
+    },
+    {
+      "id": 5,
+      "question": "What is the capacity of the export pump P-103?",
+      "ground_truth": "100 GPM at 2200 PSIG",
+      "gold_chunk_ids": ["v2_equip_P-103"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 5 spec block"
+    },
+    {
+      "id": 6,
+      "question": "What is the suction pressure of C-104?",
+      "ground_truth": "50 PSIG (3.4 BAR) at 70°F (21°C)",
+      "gold_chunk_ids": ["v2_equip_C-104"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 6 spec block"
+    },
+    {
+      "id": 7,
+      "question": "What is the discharge pressure and temperature of the gas compressor?",
+      "ground_truth": "350 PSIG (24.1 BAR) at 279.1°F (137.3°C)",
+      "gold_chunk_ids": ["v2_equip_C-104"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 6 spec block"
+    },
+    {
+      "id": 8,
+      "question": "What is the design pressure of the export pump?",
+      "ground_truth": "2200 PSIG (151.7 BAR)",
+      "gold_chunk_ids": ["v2_equip_P-103"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 5"
+    },
+    {
+      "id": 9,
+      "question": "What type of equipment is V-101 and what is its service?",
+      "ground_truth": "V-101 is a High Pressure Separator (horizontal vessel) for oil/gas separation service",
+      "gold_chunk_ids": ["v2_equip_V-101"],
+      "category": "equipment_id",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 3 title block and page 1 PFD"
+    },
+    {
+      "id": 10,
+      "question": "What is C-104 and what service does it provide?",
+      "ground_truth": "C-104 is a Gas Compressor providing gas compression service with capacity 0.50 MMSCFD",
+      "gold_chunk_ids": ["v2_equip_C-104"],
+      "category": "equipment_id",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 6 title block"
+    },
+    {
+      "id": 11,
+      "question": "What is H-105?",
+      "ground_truth": "H-105 is the Compressor Discharge Cooler (Trim: B) for gas cooling service, receiving gas from C-104",
+      "gold_chunk_ids": ["v2_equip_H-105"],
+      "category": "equipment_id",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 6 spec block"
+    },
+    {
+      "id": 12,
+      "question": "What safety valve protects V-101 from overpressure?",
+      "ground_truth": "PSV-101, a Pressure Safety Valve providing over-pressure protection",
+      "gold_chunk_ids": ["v2_equip_V-101"],
+      "category": "instrument_query",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 3 and chunk instrument list"
+    },
+    {
+      "id": 13,
+      "question": "What is the setpoint of PSV-102?",
+      "ground_truth": "75 PSIG",
+      "gold_chunk_ids": ["v2_equip_V-102"],
+      "category": "instrument_query",
+      "answer_in_chunk": true,
+      "notes": "Verified from chunk content: PSV-102 setpoint 75 PSIG"
+    },
+    {
+      "id": 14,
+      "question": "What is the setpoint of PSV-103?",
+      "ground_truth": "2200 PSIG",
+      "gold_chunk_ids": ["v2_equip_P-103"],
+      "category": "instrument_query",
+      "answer_in_chunk": true,
+      "notes": "Verified from chunk content: PSV-103 set 2200 PSIG"
+    },
+    {
+      "id": 15,
+      "question": "Where does the gas outlet of V-101 go?",
+      "ground_truth": "To the Gas Compressor (labelled TO GAS COMPRESSOR on the diagram) via 8-inch Class D line",
+      "gold_chunk_ids": ["v2_equip_V-101"],
+      "category": "connection_query",
+      "answer_in_chunk": true,
+      "notes": "Chunk has 'TO GAS COMPRESSOR' (not C-104 tag). Verified from page 3."
+    },
+    {
+      "id": 16,
+      "question": "What is the liquid outlet destination of V-101?",
+      "ground_truth": "To the LP Separator (labelled TO L.P. SEPARATOR on diagram) via 4-inch Class D line",
+      "gold_chunk_ids": ["v2_equip_V-101"],
+      "category": "connection_query",
+      "answer_in_chunk": true,
+      "notes": "Chunk has 'TO L.P. SEPARATOR'. Verified from page 3."
+    },
+    {
+      "id": 17,
+      "question": "What feeds into P-103?",
+      "ground_truth": "P-103 receives liquid from the LP Separator via a 4-inch Class A line",
+      "gold_chunk_ids": ["v2_equip_P-103"],
+      "category": "connection_query",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 5 and chunk connections"
+    },
+    {
+      "id": 18,
+      "question": "What is the motor horsepower of C-104?",
+      "ground_truth": "73 HP",
+      "gold_chunk_ids": ["v2_equip_C-104"],
+      "category": "spec_lookup",
+      "answer_in_chunk": false,
+      "notes": "73 HP visible on page 6 spec block but NOT extracted into C-104 chunk — extraction gap. Tests: retrieval correct but LLM cannot answer."
+    },
+    {
+      "id": 19,
+      "question": "What is the liquid residence time of V-102?",
+      "ground_truth": "5 minutes",
+      "gold_chunk_ids": ["v2_equip_V-102"],
+      "category": "spec_lookup",
+      "answer_in_chunk": true,
+      "notes": "Verified from page 4 spec block; V-102 chunk has '5 MIN liquid residence time'"
+    },
+    {
+      "id": 20,
+      "question": "What equipment receives gas from C-104 after compression?",
+      "ground_truth": "H-105 (Compressor Discharge Cooler) receives gas directly from C-104",
+      "gold_chunk_ids": ["v2_equip_C-104", "v2_equip_H-105"],
+      "category": "multi_equipment",
+      "answer_in_chunk": true,
+      "notes": "C-104 chunk shows 'Outlet: to H-105'. H-105 chunk shows 'Inlet: from C-104'. Verified from page 6."
+    }
+  ]
+}
