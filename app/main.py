@@ -1,17 +1,12 @@
 """
-P&ID Assistant - Main Streamlit UI
-
-A conversational AI system for querying P&ID documents.
+P&ID Assistant - Main Streamlit UI v2.0
 """
 
 import streamlit as st
-from pathlib import Path
-
-# Import engines
 import sys
+import re
 from pathlib import Path
 
-# Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.rag_engine import RAGEngine
@@ -20,7 +15,7 @@ from app.query_router import QueryRouter
 from app.mock_data import get_ticket, format_ticket
 
 
-# Page configuration
+# ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="P&ID Assistant",
     page_icon="🏭",
@@ -29,7 +24,233 @@ st.set_page_config(
 )
 
 
-# Initialize session state
+# ── Global CSS ────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+/* Import font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Global */
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Hide default Streamlit header decoration */
+#MainMenu, footer { visibility: hidden; }
+header[data-testid="stHeader"] { background: transparent; }
+
+/* ── Sidebar ── */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    border-right: 1px solid #334155;
+}
+section[data-testid="stSidebar"] * {
+    color: #cbd5e1 !important;
+}
+section[data-testid="stSidebar"] .stMarkdown h3 {
+    color: #f1f5f9 !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+}
+
+/* Demo question buttons */
+section[data-testid="stSidebar"] button[kind="secondary"] {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+    color: #94a3b8 !important;
+    font-size: 0.82rem !important;
+    font-weight: 400 !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    padding: 8px 12px !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    line-height: 1.4 !important;
+    transition: all 0.15s ease !important;
+    margin-bottom: 4px !important;
+}
+section[data-testid="stSidebar"] button[kind="secondary"]:hover {
+    background: rgba(56,189,248,0.12) !important;
+    border-color: #38bdf8 !important;
+    color: #e0f2fe !important;
+}
+
+/* Clear chat button */
+section[data-testid="stSidebar"] button[kind="primary"] {
+    background: rgba(239,68,68,0.12) !important;
+    border: 1px solid rgba(239,68,68,0.35) !important;
+    border-radius: 8px !important;
+    color: #fca5a5 !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+}
+section[data-testid="stSidebar"] button[kind="primary"]:hover {
+    background: rgba(239,68,68,0.22) !important;
+    border-color: #ef4444 !important;
+}
+
+/* Sidebar divider */
+section[data-testid="stSidebar"] hr {
+    border-color: #334155 !important;
+    margin: 12px 0 !important;
+}
+
+/* Sidebar caption */
+section[data-testid="stSidebar"] .stCaption {
+    color: #475569 !important;
+    font-size: 0.75rem !important;
+}
+
+/* ── Main area ── */
+.main-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0369a1 100%);
+    border-radius: 12px;
+    padding: 24px 32px;
+    margin-bottom: 24px;
+    border: 1px solid #0284c7;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.main-header h1 {
+    color: #f0f9ff !important;
+    font-size: 1.6rem !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    letter-spacing: -0.02em;
+}
+.main-header p {
+    color: #7dd3fc !important;
+    font-size: 0.88rem !important;
+    margin: 4px 0 0 0 !important;
+}
+.header-icon {
+    font-size: 2.4rem;
+    line-height: 1;
+}
+.header-badge {
+    margin-left: auto;
+    background: rgba(14,165,233,0.2);
+    border: 1px solid #0284c7;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.75rem;
+    color: #7dd3fc !important;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ── Chat bubbles ── */
+.user-bubble {
+    background: linear-gradient(135deg, #1e3a5f, #0f4c8a);
+    border: 1px solid #1d4ed8;
+    border-radius: 12px 12px 2px 12px;
+    padding: 12px 16px;
+    margin: 6px 0;
+    color: #e0f2fe;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    max-width: 80%;
+    margin-left: auto;
+}
+.assistant-bubble {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 2px 12px 12px 12px;
+    padding: 14px 18px;
+    margin: 6px 0;
+    color: #1e293b;
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+/* ── Route badge ── */
+.route-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.badge-rag {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+}
+.badge-vision {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fcd34d;
+}
+
+/* ── Ticket card ── */
+.ticket-card {
+    border-left: 3px solid #0284c7;
+    background: #f0f9ff;
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 0.83rem;
+}
+.ticket-card .ticket-header {
+    font-weight: 600;
+    color: #0369a1;
+    margin-bottom: 4px;
+}
+
+/* ── Stats chips ── */
+.stat-chip {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 6px 10px;
+    text-align: center;
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+.stat-chip .val {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #38bdf8;
+    display: block;
+}
+
+/* ── Chat input ── */
+[data-testid="stChatInput"] textarea {
+    border-radius: 12px !important;
+    border: 1.5px solid #e2e8f0 !important;
+    font-size: 0.92rem !important;
+    padding: 12px 16px !important;
+}
+[data-testid="stChatInput"] textarea:focus {
+    border-color: #0284c7 !important;
+    box-shadow: 0 0 0 3px rgba(2,132,199,0.12) !important;
+}
+
+/* Expander styling in sidebar */
+section[data-testid="stSidebar"] details {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid #334155 !important;
+    border-radius: 8px !important;
+}
+section[data-testid="stSidebar"] details summary {
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+    padding: 8px 12px !important;
+    color: #94a3b8 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ── Engine init ───────────────────────────────────────────────────────────────
 if 'messages' not in st.session_state:
     st.session_state.messages = []
 
@@ -45,203 +266,167 @@ if 'engines_initialized' not in st.session_state:
             st.stop()
 
 
-# Sidebar
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Header
-    st.title("P&ID Assistant")
-    st.caption("AI-powered P&ID Query System")
-
-    # Reduced spacing by 50%
-    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
-
-    # Custom CSS for clean navigation links
+    # Logo / brand
     st.markdown("""
-    <style>
-    /* Navigation category headers */
-    .nav-category {
-        font-weight: 600;
-        font-size: 0.85rem;
-        color: #31333F;
-        margin-top: 16px;
-        margin-bottom: 8px;
-        padding-left: 0px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    /* Target all sidebar buttons globally and apply link styling */
-    section[data-testid="stSidebar"] button[kind="secondary"] {
-        border: none !important;
-        background: none !important;
-        box-shadow: none !important;
-        padding: 6px 8px 6px 20px !important;
-        text-align: left !important;
-        font-weight: 400 !important;
-        color: #0068c9 !important;
-        transition: all 0.2s ease !important;
-        font-size: 0.9rem !important;
-        line-height: 1.6 !important;
-        white-space: normal !important;
-        word-wrap: break-word !important;
-    }
-    section[data-testid="stSidebar"] button[kind="secondary"]:hover {
-        background-color: #e3f2fd !important;
-        color: #0051a8 !important;
-        border-radius: 4px !important;
-        text-decoration: underline !important;
-    }
-    section[data-testid="stSidebar"] button[kind="secondary"]:focus {
-        box-shadow: none !important;
-        outline: none !important;
-    }
-    section[data-testid="stSidebar"] button[kind="secondary"]:active {
-        background-color: #bbdefb !important;
-    }
-    </style>
+    <div style='padding: 8px 0 16px 0;'>
+        <div style='font-size:1.3rem; font-weight:700; color:#f1f5f9; letter-spacing:-0.01em;'>
+            🏭 P&ID Assistant
+        </div>
+        <div style='font-size:0.75rem; color:#475569; margin-top:3px;'>
+            Gas Production Facility · D-254-001
+        </div>
+    </div>
     """, unsafe_allow_html=True)
 
-    # Example Queries Section
-    st.markdown("### 💡 Example Queries")
-
-    # Text Queries Category
-    st.markdown('<div class="nav-category">📝 Text Queries (RAG)</div>', unsafe_allow_html=True)
-    text_examples = [
-        "What is PSV-101?",
-        "What are the operating conditions for C-104?",
-        "Any recent issues with V-102?"
-    ]
-    for idx, example in enumerate(text_examples):
-        if st.button(example, key=f"ex_text_{idx}"):
-            st.session_state.current_query = example
-            st.rerun()
-
-    # Visual Queries Category
-    st.markdown('<div class="nav-category">🖼️ Visual Queries (Vision)</div>', unsafe_allow_html=True)
-    visual_examples = [
-        "Show me where V-101 is on the diagram",
-        "What equipment is connected to V-101?",
-        "Display the flow path from V-101 to C-104"
-    ]
-    for idx, example in enumerate(visual_examples):
-        if st.button(example, key=f"ex_vis_{idx}"):
-            st.session_state.current_query = example
-            st.rerun()
-
-    # Quick Actions
     st.markdown("---")
-    st.markdown("### 🎯 Quick Actions")
 
+    # Demo questions
+    st.markdown("### 💡 Questions")
+    st.markdown("<div style='font-size:0.72rem; color:#475569; margin-bottom:10px;'>Click any question to run it</div>",
+                unsafe_allow_html=True)
+
+    demo_questions = [
+        ("1", "What is V-101 and what are its operating conditions?"),
+        ("2", "What instruments control pressure on V-101?"),
+        ("3", "What safety valves protect the system?"),
+        ("4", "Tell me about C-104 compressor — specs and instruments"),
+        ("5", "What is connected to V-101 and what are the pipe sizes?"),
+        ("6", "Any recent maintenance issues with V-102?"),
+    ]
+
+    for num, question in demo_questions:
+        if st.button(question, key=f"demo_{num}", use_container_width=True):
+            st.session_state.current_query = question
+            st.rerun()
+
+    st.markdown("---")
+
+    # Combined system + session info (collapsed)
     rag_engine = st.session_state.rag_engine
-    llm_stats = rag_engine.llm_adapter.session_stats
+    stats = rag_engine.llm_adapter.session_stats
+    total_tokens = stats['total_input_tokens'] + stats['total_output_tokens']
 
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button("🗑️ Clear Chat", use_container_width=True):
-            st.session_state.messages = []
-            st.rerun()
-
-    with col_b:
-        if st.button("📊 Show Stats", use_container_width=True):
-            st.session_state.show_stats = True
-
-    # Session Statistics (below quick actions)
-    st.markdown("---")
-    with st.expander("📊 **Session Statistics**", expanded=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total", llm_stats['total_queries'], delta=None)
-        with col2:
-            total_tokens = llm_stats['total_input_tokens'] + llm_stats['total_output_tokens']
-            st.metric("Tokens", f"{total_tokens:,}", delta=None)
-
-        col3, col4 = st.columns(2)
-        with col3:
-            st.metric("📝 RAG", llm_stats['queries_by_type']['rag'])
-        with col4:
-            st.metric("🖼️ Vision", llm_stats['queries_by_type']['vision'])
-
-        st.caption(f"💰 Total Cost: ${llm_stats['total_cost']:.6f}")
-
-    # System Configuration (below statistics)
-    with st.expander("⚙️ **System Configuration**", expanded=False):
-        provider = st.session_state.rag_engine.llm_adapter.provider
-        model = st.session_state.rag_engine.llm_adapter.model
+    with st.expander("⚙️ System & Session Info"):
+        provider = rag_engine.llm_adapter.provider
+        model = rag_engine.llm_adapter.model
+        chunks = rag_engine.collection.count()
 
         st.markdown(f"""
-        **LLM Provider:** `{provider}`
-        **Model:** `{model}`
-        **Vector DB:** ChromaDB
-        **Embeddings:** text-embedding-3-small
-        """)
+        <div style='font-size:0.78rem; line-height:2; color:#94a3b8;'>
+            <div style='color:#64748b; font-size:0.68rem; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;'>System</div>
+            <b style='color:#cbd5e1;'>Provider:</b> {provider}<br>
+            <b style='color:#cbd5e1;'>Model:</b> {model}<br>
+            <b style='color:#cbd5e1;'>Vector DB:</b> ChromaDB · {chunks} chunks<br>
+            <b style='color:#cbd5e1;'>Embeddings:</b> text-embedding-3-small
+        </div>
+        """, unsafe_allow_html=True)
 
-        # Collection info
-        collection_count = st.session_state.rag_engine.collection.count()
-        st.markdown(f"**Indexed Chunks:** {collection_count}")
+        st.markdown("<div style='border-top:1px solid #334155; margin:10px 0;'></div>", unsafe_allow_html=True)
 
-    # Footer
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(f"""
+            <div class='stat-chip'>
+                <span class='val'>{stats['total_queries']}</span>
+                Queries
+            </div>""", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"""
+            <div class='stat-chip'>
+                <span class='val'>{total_tokens:,}</span>
+                Tokens
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown(f"<div style='font-size:0.72rem; color:#475569; margin-top:8px;'>💰 Est. cost: ${stats['total_cost']:.6f}</div>",
+                    unsafe_allow_html=True)
+
     st.markdown("---")
-    st.caption("**Status:** ✅ Online")
-    st.caption(f"**Queries:** {llm_stats['total_queries']} | **Cost:** ${llm_stats['total_cost']:.4f}")
+
+    # Clear chat
+    if st.button("🗑️  Clear Conversation", key="clear", use_container_width=True, type="primary"):
+        st.session_state.messages = []
+        st.rerun()
+
+    st.markdown("<div style='font-size:0.7rem; color:#334155; margin-top:8px; text-align:center;'>v2.0 · Gemini Flash · ChromaDB</div>",
+                unsafe_allow_html=True)
 
 
-# Main content
-st.title("P&ID Assistant")
-st.markdown("*Ask questions about your P&ID documents in natural language*")
+# ── Header banner ─────────────────────────────────────────────────────────────
+st.markdown("""
+<div class='main-header'>
+    <div class='header-icon'>🏭</div>
+    <div>
+        <h1>P&ID Assistant</h1>
+        <p>Ask questions about plant equipment, instruments, and piping in plain English</p>
+    </div>
+    <div class='header-badge'>● Live · D-254-001</div>
+</div>
+""", unsafe_allow_html=True)
 
-# Display chat messages
+
+
+# ── Chat history ──────────────────────────────────────────────────────────────
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
+        if message["role"] == "assistant":
+            # Route badge
+            route = message.get("metadata", {}).get("route", "rag")
+            badge_class = "badge-rag" if route == "rag" else "badge-vision"
+            badge_label = "RAG · Vector Search" if route == "rag" else "Vision · Image Analysis"
+            st.markdown(f"<span class='route-badge {badge_class}'>{badge_label}</span>",
+                        unsafe_allow_html=True)
+
         st.markdown(message["content"])
 
-        # Display P&ID images for vision queries
+        # P&ID images for vision queries
         if "images" in message and message["role"] == "assistant":
-            st.markdown("#### 📊 Referenced P&ID Diagrams:")
-            cols = st.columns(len(message["images"]))
+            st.markdown("**Referenced P&ID Diagrams:**")
+            cols = st.columns(min(len(message["images"]), 3))
             for idx, img_path in enumerate(message["images"]):
-                with cols[idx]:
+                with cols[idx % 3]:
                     try:
                         from PIL import Image
                         img = Image.open(img_path)
-                        st.image(img, caption=f"Page {idx+1}", use_container_width=True)
+                        st.image(img, caption=f"Page {idx + 1}", use_container_width=True)
                     except Exception as e:
-                        st.error(f"Error loading image: {e}")
+                        st.error(f"Could not load image: {e}")
 
-        # Display ticket info if available (compact version)
+        # Maintenance ticket
         if "ticket" in message and message["role"] == "assistant" and message["ticket"]:
-            ticket = message["ticket"]
+            t = message["ticket"]
             st.markdown(f"""
-            <div style='border-left: 3px solid #0068c9; padding: 8px 12px; margin-top: 12px; font-size: 0.85rem;'>
-                <div style='font-weight: 600; margin-bottom: 4px; color: #0068c9;'>📋 {ticket['equipment']}</div>
-                <div style='margin-bottom: 4px;'><b>Issue:</b> {ticket['issue']}</div>
-                <div style='margin-bottom: 4px;'><b>Resolution:</b> {ticket['resolution']}</div>
-                <div style='font-size: 0.8rem;'>
-                    {ticket['status_emoji']} {ticket['status']} • Priority: {ticket['priority']} • {ticket['resolved']}
+            <div class='ticket-card'>
+                <div class='ticket-header'>📋 Maintenance Ticket · {t['equipment']}</div>
+                <div><b>Issue:</b> {t['issue']}</div>
+                <div><b>Resolution:</b> {t['resolution']}</div>
+                <div style='margin-top:4px; font-size:0.78rem; color:#475569;'>
+                    {t['status_emoji']} {t['status']} &nbsp;·&nbsp; Priority: {t['priority']} &nbsp;·&nbsp; {t['resolved']}
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
 
-# Chat input
-if prompt := st.chat_input("Ask me about P&IDs...") or st.session_state.get('current_query'):
-    # Use example query if available
-    if st.session_state.get('current_query'):
-        prompt = st.session_state.current_query
-        st.session_state.current_query = None
+# ── Chat input & processing ───────────────────────────────────────────────────
+prompt = st.chat_input("Ask about equipment, instruments, safety systems...")
 
-    # Add user message to chat
+if not prompt and st.session_state.get('current_query'):
+    prompt = st.session_state.current_query
+    st.session_state.current_query = None
+
+if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Process query
     with st.chat_message("assistant"):
-        with st.spinner("Analyzing..."):
+        with st.spinner("Searching P&ID knowledge base..."):
             try:
-                # Check for tickets BEFORE processing query
+                # Check for maintenance tickets
                 ticket_info = None
-                import re
                 tags = re.findall(r'\b[A-Z]+-\d+[A-Z]?\b', prompt.upper())
-
                 for tag in tags:
                     ticket = get_ticket(tag)
                     if ticket:
@@ -249,68 +434,56 @@ if prompt := st.chat_input("Ask me about P&IDs...") or st.session_state.get('cur
                         break
 
                 # Route query
-                router = st.session_state.router
-                route = router.route_query(prompt)
+                route = st.session_state.router.route_query(prompt)
 
-                # If there's a ticket and query is about issues/maintenance, enhance the query
+                # Enhance with ticket context if relevant
                 enhanced_prompt = prompt
-                if ticket_info and any(word in prompt.lower() for word in ['issue', 'problem', 'maintenance', 'recent', 'ticket', 'service']):
+                if ticket_info and any(w in prompt.lower() for w in ['issue', 'problem', 'maintenance', 'recent', 'ticket', 'service']):
                     enhanced_prompt = f"{prompt}\n\nNote: There is a maintenance ticket for this equipment: {ticket_info}"
 
-                # Process based on route
+                # Execute
                 if route == "rag":
                     answer, metadata = st.session_state.rag_engine.query_rag(enhanced_prompt)
-                else:  # vision
+                else:
                     answer, metadata = st.session_state.vision_engine.query_vision(enhanced_prompt)
 
-                # Display answer
+                # Show route badge + answer
+                badge_class = "badge-rag" if route == "rag" else "badge-vision"
+                badge_label = "RAG · Vector Search" if route == "rag" else "Vision · Image Analysis"
+                st.markdown(f"<span class='route-badge {badge_class}'>{badge_label}</span>",
+                            unsafe_allow_html=True)
                 st.markdown(answer)
 
-                # Display ticket if available (compact version)
+                # Show ticket card
                 if ticket_info:
-                    with st.container():
-                        st.markdown(f"""
-                        <div style='border-left: 3px solid #0068c9; padding: 8px 12px; margin-top: 12px; font-size: 0.85rem;'>
-                            <div style='font-weight: 600; margin-bottom: 4px; color: #0068c9;'>📋 {ticket_info['equipment']}</div>
-                            <div style='margin-bottom: 4px;'><b>Issue:</b> {ticket_info['issue']}</div>
-                            <div style='margin-bottom: 4px;'><b>Resolution:</b> {ticket_info['resolution']}</div>
-                            <div style='font-size: 0.8rem;'>
-                                {ticket_info['status_emoji']} {ticket_info['status']} • Priority: {ticket_info['priority']} • {ticket_info['resolved']}
-                            </div>
+                    t = ticket_info
+                    st.markdown(f"""
+                    <div class='ticket-card'>
+                        <div class='ticket-header'>📋 Maintenance Ticket · {t['equipment']}</div>
+                        <div><b>Issue:</b> {t['issue']}</div>
+                        <div><b>Resolution:</b> {t['resolution']}</div>
+                        <div style='margin-top:4px; font-size:0.78rem; color:#475569;'>
+                            {t['status_emoji']} {t['status']} &nbsp;·&nbsp; Priority: {t['priority']} &nbsp;·&nbsp; {t['resolved']}
                         </div>
-                        """, unsafe_allow_html=True)
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                # Save to chat history
+                # Save to history
                 metadata['route'] = route
-                message_data = {
+                msg = {
                     "role": "assistant",
                     "content": answer,
                     "metadata": metadata,
                     "ticket": ticket_info
                 }
-
-                # Add images if vision query
                 if route == "vision" and "image_paths" in metadata:
-                    message_data["images"] = metadata["image_paths"]
+                    msg["images"] = metadata["image_paths"]
 
-                st.session_state.messages.append(message_data)
+                st.session_state.messages.append(msg)
 
             except Exception as e:
-                error_msg = f"Error processing query: {str(e)}"
-                st.error(error_msg)
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": error_msg
-                })
+                err = f"Error processing query: {str(e)}"
+                st.error(err)
+                st.session_state.messages.append({"role": "assistant", "content": err})
 
-    # Rerun to update UI
     st.rerun()
-
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: gray; font-size: 0.8em;'>
-    P&ID Assistant v1.0 MVP | Powered by Gemini Flash, OpenAI, ChromaDB
-</div>
-""", unsafe_allow_html=True)
