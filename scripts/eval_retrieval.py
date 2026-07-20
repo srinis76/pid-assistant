@@ -29,8 +29,10 @@ load_dotenv(ROOT / ".env")
 import chromadb
 from openai import OpenAI
 
+from app.hybrid_retriever import HybridRetriever
 
-def run_eval(dataset_path, out_path, k_values):
+
+def run_eval(dataset_path, out_path, k_values, mode="vector"):
     with open(dataset_path) as f:
         ds = json.load(f)
     questions = ds["questions"]
@@ -43,14 +45,29 @@ def run_eval(dataset_path, out_path, k_values):
     openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     emb_model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
+    # Hybrid retriever (dense + BM25 via RRF) built once when mode=hybrid.
+    hybrid = None
+    candidate_k = int(os.getenv("HYBRID_CANDIDATE_K", "10"))
+    if mode == "hybrid":
+        hybrid = HybridRetriever(
+            coll,
+            dense_weight=float(os.getenv("HYBRID_DENSE_WEIGHT", "1.0")),
+            sparse_weight=float(os.getenv("HYBRID_SPARSE_WEIGHT", "1.0")),
+            rrf_k=int(os.getenv("HYBRID_RRF_K", "60")),
+        )
+
     max_k = max(k_values)
     results = []
 
     print(f"\n{'='*60}")
-    print("  RAG Top-K Retrieval Accuracy Eval")
+    print(f"  RAG Top-K Retrieval Accuracy Eval  [mode={mode}]")
     print(f"{'='*60}")
     print(f"Dataset : {dataset_path}  ({len(questions)} questions)")
-    print(f"K values: {k_values}  |  Collection: {coll.count()} chunks\n")
+    print(f"K values: {k_values}  |  Collection: {coll.count()} chunks")
+    if mode == "hybrid":
+        print(f"Hybrid  : candidate_k={candidate_k}, "
+              f"dense_w={hybrid.dense_weight}, sparse_w={hybrid.sparse_weight}, rrf_k={hybrid.rrf_k}")
+    print()
 
     for q in questions:
         qid = q["id"]
@@ -58,18 +75,25 @@ def run_eval(dataset_path, out_path, k_values):
         gold_ids = set(q["gold_chunk_ids"])
         answer_in_chunk = q["answer_in_chunk"]
 
-        # Embed
+        # Embed (needed for dense retrieval in both modes)
         emb = openai.embeddings.create(model=emb_model, input=question).data[0].embedding
 
-        # Retrieve top max_k
-        res = coll.query(
-            query_embeddings=[emb],
-            n_results=min(max_k, coll.count()),
-            include=["metadatas", "distances"]
-        )
-        retrieved_ids = [res["ids"][0][i] for i in range(len(res["ids"][0]))]
-        distances = res["distances"][0]
-        similarities = [round(1 - d, 4) for d in distances]
+        if mode == "hybrid":
+            # Fused dense + BM25 ranking. Pull enough candidates for hit@max_k.
+            retrieved_ids = hybrid.retrieve_ids(
+                question, emb, top_k=max_k, candidate_k=max(candidate_k, max_k)
+            )
+            similarities = [None] * len(retrieved_ids)  # fusion scores not comparable to cosine
+        else:
+            # Dense-only top max_k
+            res = coll.query(
+                query_embeddings=[emb],
+                n_results=min(max_k, coll.count()),
+                include=["metadatas", "distances"]
+            )
+            retrieved_ids = [res["ids"][0][i] for i in range(len(res["ids"][0]))]
+            distances = res["distances"][0]
+            similarities = [round(1 - d, 4) for d in distances]
 
         # Hit@K for each K
         hits = {}
@@ -151,6 +175,7 @@ def run_eval(dataset_path, out_path, k_values):
         "metadata": {
             "timestamp": datetime.now().isoformat(),
             "dataset": dataset_path,
+            "mode": mode,
             "embedding_model": emb_model,
             "k_values": k_values,
             "total_questions": n,
@@ -206,6 +231,8 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", default="tests/retrieval_eval_dataset.json")
     parser.add_argument("--out", default=f"results/retrieval_eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
     parser.add_argument("--k", nargs="+", type=int, default=[1, 3, 5])
+    parser.add_argument("--mode", choices=["vector", "hybrid"], default="vector",
+                        help="Retrieval mode: dense-only (vector) or dense+BM25 fusion (hybrid)")
     args = parser.parse_args()
 
-    run_eval(args.dataset, args.out, args.k)
+    run_eval(args.dataset, args.out, args.k, mode=args.mode)

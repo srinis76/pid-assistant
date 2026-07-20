@@ -13,9 +13,11 @@ from dotenv import load_dotenv
 try:
     from app.llm_adapter import LLMAdapter
     from app.phoenix_tracer import init_tracing
+    from app.hybrid_retriever import HybridRetriever
 except ModuleNotFoundError:
     from llm_adapter import LLMAdapter
     from phoenix_tracer import init_tracing
+    from hybrid_retriever import HybridRetriever
 
 load_dotenv()
 
@@ -43,10 +45,23 @@ class RAGEngine:
         # Initialize LLM adapter
         self.llm_adapter = LLMAdapter()
 
+        # Retrieval mode: "vector" (dense only) or "hybrid" (dense + BM25 via RRF)
+        self.retrieval_mode = os.getenv("RETRIEVAL_MODE", "vector").lower()
+        self.candidate_k = int(os.getenv("HYBRID_CANDIDATE_K", "10"))
+        self.hybrid_retriever = None
+        if self.retrieval_mode == "hybrid":
+            self.hybrid_retriever = HybridRetriever(
+                self.collection,
+                dense_weight=float(os.getenv("HYBRID_DENSE_WEIGHT", "1.0")),
+                sparse_weight=float(os.getenv("HYBRID_SPARSE_WEIGHT", "1.0")),
+                rrf_k=int(os.getenv("HYBRID_RRF_K", "60")),
+            )
+
         print(f"📚 RAG Engine initialized")
         print(f"   Vector DB: {vector_db_path}")
         print(f"   Collection: pid_chunks ({self.collection.count()} chunks)")
         print(f"   Embedding model: {self.embedding_model}")
+        print(f"   Retrieval mode: {self.retrieval_mode}")
         print()
 
     def generate_query_embedding(self, query: str) -> List[float]:
@@ -108,7 +123,12 @@ class RAGEngine:
         for i, result in enumerate(results):
             metadata = result['metadata']
             text = result['text']
-            relevance = 1 - result['distance']  # Convert distance to similarity score
+            # Dense results carry 'distance' (cosine); hybrid results carry a
+            # 'fusion_score' from RRF. Prefer the similarity when available.
+            if 'distance' in result:
+                relevance = 1 - result['distance']
+            else:
+                relevance = result.get('fusion_score', 0.0)
 
             context_parts.append(
                 f"[Source {i+1} - Page {metadata.get('page_number', 'N/A')} - Relevance: {relevance:.2f}]\n"
@@ -135,9 +155,16 @@ class RAGEngine:
         query_embedding = self.generate_query_embedding(query)
         print(f"   ✓ Generated query embedding ({len(query_embedding)} dimensions)")
 
-        # 2. Search vector DB
-        results = self.search_vector_db(query_embedding, top_k)
-        print(f"   ✓ Found {len(results)} relevant chunks")
+        # 2. Retrieve — hybrid (dense + BM25 via RRF) or dense-only
+        if self.hybrid_retriever is not None:
+            results = self.hybrid_retriever.retrieve(
+                query, query_embedding, top_k=top_k, candidate_k=self.candidate_k
+            )
+            print(f"   ✓ Hybrid retrieval found {len(results)} chunks "
+                  f"(dense+BM25 fused, candidate_k={self.candidate_k})")
+        else:
+            results = self.search_vector_db(query_embedding, top_k)
+            print(f"   ✓ Found {len(results)} relevant chunks")
 
         if not results:
             return "I couldn't find any relevant information in the P&ID documents.", {}
@@ -169,8 +196,12 @@ Answer:"""
         # Prepare metadata
         metadata = {
             'num_chunks_retrieved': len(results),
+            'retrieval_mode': self.retrieval_mode,
             'sources': [r['metadata'] for r in results],
-            'relevance_scores': [1 - r['distance'] for r in results]
+            'relevance_scores': [
+                (1 - r['distance']) if 'distance' in r else r.get('fusion_score', 0.0)
+                for r in results
+            ]
         }
 
         print(f"   ✓ Answer generated\n")
