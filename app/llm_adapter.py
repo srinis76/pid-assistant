@@ -71,6 +71,19 @@ class LLMAdapter:
                 raise ValueError("CLAUDE_API_KEY not found in environment")
             self.claude_client = Anthropic(api_key=api_key)
 
+        elif self.provider == "openrouter":
+            # OpenRouter is OpenAI-compatible: reuse the OpenAI SDK pointed at
+            # OpenRouter's base URL. Model switching is then just changing
+            # LLM_MODEL to any OpenRouter slug (e.g. "openai/gpt-4o-mini",
+            # "google/gemini-2.5-flash-lite", "anthropic/claude-sonnet-4-5").
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if not api_key:
+                raise ValueError("OPENROUTER_API_KEY not found in environment")
+            self.openrouter_client = OpenAI(
+                api_key=api_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
+
         else:
             raise ValueError(f"Unknown provider: {self.provider}")
 
@@ -100,6 +113,8 @@ class LLMAdapter:
             response, tokens = self._call_openai(prompt, images)
         elif self.provider == "claude":
             response, tokens = self._call_claude(prompt, images)
+        elif self.provider == "openrouter":
+            response, tokens = self._call_openrouter(prompt, images)
         else:
             raise ValueError(f"Unknown provider: {self.provider}")
 
@@ -208,6 +223,8 @@ class LLMAdapter:
 
         if self.provider == "gemini":
             response, tokens = self._call_gemini_json(prompt, images)
+        elif self.provider == "openrouter":
+            response, tokens = self._call_openrouter(prompt, images, json_mode=True)
         else:
             # Fall back to regular call for other providers
             response, tokens = self._call_gemini(prompt, images) if self.provider == "gemini" else (None, {})
@@ -259,6 +276,64 @@ class LLMAdapter:
 
         return response.choices[0].message.content, tokens
 
+    def _call_openrouter(
+        self,
+        prompt: str,
+        images: Optional[List[str]],
+        json_mode: bool = False,
+    ) -> Tuple[str, Dict]:
+        """
+        Call any model via OpenRouter (OpenAI-compatible chat completions).
+
+        Uses the same message format as OpenAI, so text and vision both work.
+        Requests OpenRouter's usage accounting so we get the *actual* cost of
+        the call back (`usage.cost`) rather than maintaining a pricing table
+        for every model — important for the cross-model eval matrix.
+        """
+        # Build messages (identical to the OpenAI format).
+        if images:
+            content = [{"type": "text", "text": prompt}]
+            for img_b64 in images:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{img_b64}"},
+                })
+            messages = [{"role": "user", "content": content}]
+        else:
+            messages = [{"role": "user", "content": prompt}]
+
+        kwargs = {
+            "model": self.model,
+            "messages": messages,
+            # Ask OpenRouter to include cost/accounting in the usage object.
+            "extra_body": {"usage": {"include": True}},
+            # Optional attribution headers (good OpenRouter citizenship).
+            "extra_headers": {
+                "HTTP-Referer": "https://github.com/srinis76/pid-assistant",
+                "X-Title": "P&ID Assistant",
+            },
+        }
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+            kwargs["temperature"] = 0.1
+
+        response = self.openrouter_client.chat.completions.create(**kwargs)
+
+        usage = response.usage
+        tokens = {
+            "input_tokens": getattr(usage, "prompt_tokens", 0) or 0,
+            "output_tokens": getattr(usage, "completion_tokens", 0) or 0,
+            "total_tokens": getattr(usage, "total_tokens", 0) or 0,
+        }
+        # OpenRouter returns the real cost (USD) when usage.include is set.
+        actual_cost = getattr(usage, "cost", None)
+        if actual_cost is None and hasattr(usage, "model_extra"):
+            actual_cost = (usage.model_extra or {}).get("cost")
+        if actual_cost is not None:
+            tokens["actual_cost"] = float(actual_cost)
+
+        return response.choices[0].message.content, tokens
+
     def _call_claude(
         self,
         prompt: str,
@@ -302,6 +377,11 @@ class LLMAdapter:
 
     def _calculate_cost(self, tokens: Dict) -> float:
         """Calculate estimated cost based on provider pricing"""
+
+        # OpenRouter returns the true cost of the call — prefer it over any
+        # static pricing table (no per-model maintenance needed).
+        if "actual_cost" in tokens:
+            return tokens["actual_cost"]
 
         # Pricing per million tokens (as of Jan 2025)
         pricing = {
