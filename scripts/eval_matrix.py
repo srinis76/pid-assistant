@@ -35,15 +35,20 @@ load_dotenv(ROOT / ".env")
 from openai import OpenAI
 
 
-# Default line-up: cheap + diverse across providers, all via OpenRouter.
-DEFAULT_MODELS = [
-    "openai/gpt-4o-mini",
-    "google/gemini-2.5-flash-lite",
-    "meta-llama/llama-3.3-70b-instruct",
-]
+# Model line-up + fixed judge are read from config/models.json (single source
+# of truth shared with the vision matrix). CLI --models overrides the list.
+CONFIG_PATH = ROOT / "config" / "models.json"
 
+
+def load_config():
+    with open(CONFIG_PATH) as f:
+        return json.load(f)
+
+
+_cfg = load_config()
+DEFAULT_MODELS = _cfg["generation_models"]
 # Fixed judge — kept constant so scores are comparable across candidate models.
-JUDGE_MODEL = "openai/gpt-4o-mini"
+JUDGE_MODEL = _cfg.get("judge_model", "openai/gpt-4o-mini")
 
 JUDGE_PROMPT = """You are an expert evaluator for a P&ID (Piping and Instrumentation Diagram) QA system.
 
