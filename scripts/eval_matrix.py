@@ -95,6 +95,38 @@ def judge(client, question, ground_truth, context, answer):
                 return {"answer_correctness": None, "faithfulness": None, "error": str(e)}
 
 
+def build_context_text(rag, meta):
+    """
+    Reconstruct the retrieved chunks' full text from query_rag metadata.
+
+    query_rag returns source *metadata* (tags), not the chunk text. To score
+    faithfulness the judge needs the actual text the model was grounded on, so
+    we map each source back to its ChromaDB chunk id and fetch the document.
+    Equipment chunk ids follow `v2_equip_<TAG>`; we fall back to the tag label
+    if a document can't be fetched.
+    """
+    sources = meta.get("sources", [])
+    chunk_ids, labels = [], []
+    for s in sources:
+        tag = s.get("equipment_tag")
+        labels.append(tag or str(s.get("page_number", "?")))
+        if tag:
+            chunk_ids.append(f"v2_equip_{tag}")
+
+    texts = []
+    if chunk_ids:
+        try:
+            fetched = rag.collection.get(ids=chunk_ids, include=["documents"])
+            texts = [d for d in fetched.get("documents", []) if d]
+        except Exception:
+            texts = []
+
+    if texts:
+        return "\n---\n".join(texts)
+    # Fallback: at least tell the judge which chunks were retrieved.
+    return "\n".join(f"[{lbl}]" for lbl in labels)
+
+
 def run_model(model_slug, test_cases, top_k, judge_client):
     """Run the full RAG pipeline for one model and score every question."""
     # Point the adapter at this model via OpenRouter BEFORE building the engine
@@ -121,9 +153,12 @@ def run_model(model_slug, test_cases, top_k, judge_client):
         toks = (rag.llm_adapter.session_stats["total_input_tokens"]
                 + rag.llm_adapter.session_stats["total_output_tokens"] - before_tok)
 
-        context = "\n".join(
-            f"[{s.get('equipment_tag', s.get('page_number', '?'))}]" for s in meta.get("sources", [])
-        )
+        # Reconstruct the ACTUAL retrieved chunk text (not just tags) so the
+        # judge can properly assess faithfulness — i.e. whether the answer's
+        # claims are grounded in what the retriever actually surfaced. This is
+        # the same text the model saw via assemble_context(); we re-fetch it
+        # from ChromaDB by chunk id (cheap, no embedding call).
+        context = build_context_text(rag, meta)
         scores = judge(judge_client, q, gt, context, answer)
 
         per_q.append({
