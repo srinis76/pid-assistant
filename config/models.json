@@ -1,0 +1,24 @@
+{
+  "_note": "Single source of truth for the eval matrices. generation_models use OpenRouter slugs (chat completions). vision_models use native Gemini names (google.generativeai) because the vision extractor is Gemini-based. judge_model is the fixed LLM-as-judge for the generation matrix. Edit these lists to change what the matrices sweep.",
+
+  "judge_model": "openai/gpt-4o-mini",
+
+  "generation_models": [
+    "openai/gpt-4o-mini",
+    "google/gemini-2.5-flash-lite",
+    "meta-llama/llama-3.3-70b-instruct"
+  ],
+
+  "vision_models": [
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro"
+  ],
+
+  "vision_pricing_per_million": {
+    "_note": "Approximate USD per 1M tokens [input, output], used only for the cost column in the vision matrix.",
+    "gemini-2.5-flash-lite": [0.10, 0.40],
+    "gemini-2.5-flash": [0.30, 2.50],
+    "gemini-2.5-pro": [1.25, 10.00]
+  }
+}
