@@ -26,13 +26,14 @@ The P&ID Assistant is a hybrid AI system combining Retrieval Augmented Generatio
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **UI** | Streamlit | Chat interface |
+| **API / UI** | FastAPI + custom single-page frontend | Service + chat interface (Streamlit legacy) |
 | **Backend** | Python 3.11+ | Application logic |
-| **LLM** | Gemini Flash (default) | Vision + text understanding |
-| **Vector DB** | ChromaDB | Semantic search |
-| **Database** | SQLite | Document metadata |
-| **PDF Processing** | PyMuPDF | Text + image extraction |
-| **Embeddings** | OpenAI API | Text vectorization |
+| **LLM** | OpenRouter (any model); native Gemini/OpenAI/Claude | Vision + text understanding |
+| **Retrieval** | ChromaDB (dense) + in-house BM25, fused via RRF | Hybrid semantic + lexical search |
+| **Database** | SQLite | Equipment / instrument / connection metadata |
+| **PDF / Vision** | PyMuPDF + vision LLM | Image extraction + structured extraction |
+| **Embeddings** | OpenAI (`text-embedding-3-small`) | Text vectorization |
+| **Evaluation** | Custom 3-layer harness | Retrieval / generation / vision quality |
 
 ---
 
@@ -355,6 +356,31 @@ def route_query(query: str) -> QueryType:
 
 **Purpose**: Retrieve relevant context and generate answers using text-only LLM
 
+**Retrieval modes** (`RETRIEVAL_MODE` env var):
+- `vector` — dense-only semantic search over ChromaDB (baseline)
+- `hybrid` — dense + BM25 lexical, fused via Reciprocal Rank Fusion (see 3.3.1)
+
+The retrieval step branches on the mode; the `query_rag` interface and downstream
+context assembly are identical, so the mode is a drop-in swap.
+
+#### 3.3.1 Hybrid Retriever (`app/hybrid_retriever.py`)
+
+P&ID queries are dominated by alphanumeric tags (`V-101`, `PSV-101`, `PIC-101A`).
+Dense embeddings blur near-identical identifiers (`V-101` vs `V-102`) and handle
+rare tokens poorly; BM25 does exact token matching. The hybrid retriever fuses both:
+
+- **Dense** — ChromaDB vector search (top `candidate_k`)
+- **Sparse** — in-house Okapi BM25 (no third-party dependency) with a tag-aware
+  tokenizer that preserves full P&ID tags as atomic tokens. Built from the same
+  ChromaDB `documents` (chunk text), so both retrievers share one store and one
+  set of chunk ids.
+- **Fusion** — Reciprocal Rank Fusion: `score(id) = Σ weight / (k + rank)`, robust
+  to the different score scales of cosine similarity and BM25. `k=60` default.
+
+**Measured lift** (20-question retrieval eval): hit@1 80% → **85%**, MRR@10 90.2%
+→ **92.7%**, spec-lookup hit@3 90% → **100%**. Example: "motor HP of C-104" — dense
+ranked the correct chunk #5, BM25 #1; fusion recovered it to #1.
+
 **Core Functions**:
 
 ```python
@@ -546,6 +572,17 @@ Be specific about locations, connections, and equipment shown in the diagrams.""
 ### 3.5 LLM Adapter (`app/llm_adapter.py`)
 
 **Purpose**: Abstract LLM provider differences, enable easy switching
+
+**Providers**: `gemini`, `openai`, `claude`, and **`openrouter`**. OpenRouter is
+OpenAI-compatible (same SDK, `base_url=https://openrouter.ai/api/v1`), so switching
+across 300+ models is a one-line `LLM_MODEL` change to a slug
+(`google/gemini-2.5-flash-lite`, `openai/gpt-4o-mini`, `anthropic/claude-sonnet-4-5`, …)
+with no code change. The adapter requests OpenRouter's usage accounting and logs the
+**actual per-call cost** (`usage.cost`) rather than maintaining a static price table.
+Embeddings always use OpenAI directly (OpenRouter is chat-completions only).
+
+Model line-ups for the evaluation matrices live in **`config/models.json`**
+(`generation_models`, `vision_models`, `judge_model`).
 
 **Implementation**:
 
@@ -845,6 +882,39 @@ Priority: {ticket['priority']}
 
 ---
 
+### 3.7 API Service (`api/main.py`, `api/schemas.py`)
+
+**Purpose**: Expose the engines over HTTP and serve the single-page frontend as one
+deployable service (the primary interface; Streamlit `app/main.py` is legacy).
+
+**Design**: engines (`RAGEngine`, `VisionEngine`, `QueryRouter`) are expensive to
+construct (load ChromaDB + models), so they are initialized **once** at startup via a
+FastAPI lifespan and reused across requests.
+
+**Endpoints**:
+
+| Method / Path | Purpose |
+|---|---|
+| `POST /api/query` | Route (RAG vs Vision) → run engine → ticket lookup → return answer, sources, telemetry |
+| `GET /api/pages/{n}` | Serve a rendered P&ID page image (used by vision answers) |
+| `GET /` | Serve the frontend (`static/index.html`) |
+| `GET /health` | Live config: provider, model, retrieval mode, chunk count |
+
+**Response shape** (`api/schemas.py`) matches what the frontend renders — answer, route,
+`sources[]` (tag · name · drawing · sheet · rank · relevance · chunk_id), optional ticket,
+optional `image_url`, and a telemetry block (latency, tokens, cost, model, retrieval mode).
+Per-query telemetry is captured by snapshotting the adapter's session stats before/after
+the call. In hybrid mode, `relevance` is the RRF **fusion score** (not a 0–1 similarity),
+so the UI presents **rank + mode**, not a misleading percentage.
+
+**Frontend** (`static/index.html`): a fetch-driven single-page app with human-readable
+citations, an operator/engineer detail toggle, conversation history (localStorage),
+per-answer feedback, and inline vision-diagram display. Mobile-first for field use.
+
+**Run**: `uvicorn api.main:app --port 8000`
+
+---
+
 ## 4. Database Design
 
 ### 4.1 SQLite Schema
@@ -971,13 +1041,21 @@ pid-assistant/
 
 ```bash
 # LLM Provider Configuration
-LLM_PROVIDER=gemini                    # Options: gemini, openai, claude
-LLM_MODEL=gemini-1.5-flash             # Model name
+LLM_PROVIDER=gemini                    # gemini, openai, claude, or openrouter
+LLM_MODEL=gemini-2.5-flash             # model name (or OpenRouter slug)
 
 # API Keys
 GEMINI_API_KEY=your_gemini_key_here
-OPENAI_API_KEY=your_openai_key_here    # For embeddings
-CLAUDE_API_KEY=your_claude_key_here    # Optional for finals
+OPENAI_API_KEY=your_openai_key_here    # For embeddings (always OpenAI)
+CLAUDE_API_KEY=your_claude_key_here    # Optional
+OPENROUTER_API_KEY=your_openrouter_key # Unified access to 300+ models
+
+# Retrieval
+RETRIEVAL_MODE=hybrid                  # vector (dense) or hybrid (dense + BM25 via RRF)
+HYBRID_CANDIDATE_K=10                  # candidates per retriever before fusion
+HYBRID_DENSE_WEIGHT=1.0
+HYBRID_SPARSE_WEIGHT=1.0
+HYBRID_RRF_K=60                        # RRF dampening constant
 
 # Application Settings
 ENABLE_TOKEN_TRACKING=true
@@ -1062,10 +1140,13 @@ pytest>=7.0.0
 **Startup Commands**:
 ```bash
 # 1. Run ingestion (one-time)
-python scripts/ingest_pdfs.py
+python scripts/ingest_pdfs_v2.py
 
-# 2. Start application
-streamlit run app/main.py
+# 2. Start the API service (primary) — serves API + frontend on :8000
+uvicorn api.main:app --port 8000
+
+# (legacy) Streamlit UI on :8501
+# streamlit run app/main.py
 ```
 
 ### 7.2 Production Deployment (Future)
@@ -1191,6 +1272,36 @@ streamlit run app/main.py
    - Practice demo flow
    - Document known limitations
    - Generate session summary report
+
+---
+
+## 8a. Evaluation Framework
+
+Every major architectural choice is validated by an eval that targets a **specific
+failure mode**. The three layers are independent and use methods appropriate to each —
+deterministic scoring where ground truth exists, LLM-as-judge only where it doesn't.
+
+| Layer | Script | Question it answers | Method |
+|---|---|---|---|
+| **1 · Retrieval** | `scripts/eval_retrieval.py` | Did we fetch the right chunk? | hit@1 / hit@3 / MRR vs gold chunk ids (deterministic). `--mode vector\|hybrid` |
+| **2 · Generation** | `scripts/eval_matrix.py` | Is the answer correct & grounded? | LLM-as-judge (correctness + faithfulness) across N models; judge held constant |
+| **3 · Vision extraction** | `scripts/eval_vision_matrix.py` | Did the model read the P&ID correctly? | Tag recall / field coverage / mapping vs `tests/ground_truth.json` (deterministic) |
+
+**Cross-model matrices**: layers 2 and 3 sweep the model line-ups in
+`config/models.json`, reporting quality vs latency vs cost side by side — turning
+"which model?" into a measured decision. Layer 2 runs the *same* pipeline swapping only
+the generation model (via OpenRouter); layer 3 runs each vision model's extraction into a
+**temporary database** (production data untouched) and scores it.
+
+**Key finding — vision extraction is stochastic**: because each P&ID page is read
+independently, the same model + code can yield 12, 12, then 5 equipment on identical runs.
+`eval_vision_matrix.py --runs N` averages and reports mean ± std for this reason; a
+single-run benchmark would mislead.
+
+**Representative results**:
+- Retrieval: hybrid hit@1 **85%** (vs 80% vector), MRR@10 **92.7%**
+- Generation: `gemini-2.5-flash-lite` — correctness **90%**, faithfulness **95%**, 1.2s, $0.0017 (best of 3)
+- Vision: `gemini-2.5-flash` — tag recall **~92% ±4** over 3 runs
 
 ---
 

@@ -40,31 +40,34 @@ python scripts/init_chromadb.py
 
 ### Ingestion & Processing
 ```bash
-# Ingest P&ID PDFs into vector store and SQLite
-python scripts/ingest_pdfs.py
+# Ingest P&ID PDFs (vision-based extraction → SQLite + ChromaDB)
+python scripts/ingest_pdfs_v2.py
 
-# Verify ingestion completed successfully
+# Verify ingestion / embeddings
 python scripts/verify_ingestion.py
-
-# Check embeddings were generated
 python scripts/check_embeddings.py
 ```
 
 ### Running the Application
 ```bash
-# Start Streamlit app (opens at http://localhost:8501)
-streamlit run app/main.py
+# PRIMARY: FastAPI service — serves API + frontend at http://localhost:8000
+uvicorn api.main:app --port 8000
 
-# Run with verbose logging
-VERBOSE_LOGGING=true streamlit run app/main.py
+# LEGACY: Streamlit UI at http://localhost:8501
+streamlit run app/main.py
+```
+
+### Evaluation (three layers)
+```bash
+python scripts/eval_retrieval.py --mode hybrid      # L1 retrieval: hit@K / MRR
+python scripts/eval_matrix.py                       # L2 generation: cross-model LLM judge
+python scripts/eval_vision_matrix.py --runs 3       # L3 vision extraction vs ground truth
+# Model line-ups: config/models.json
 ```
 
 ### Testing
 ```bash
-# Run tests
 pytest tests/
-
-# Run specific test file
 pytest tests/test_ingestion.py -v
 ```
 
@@ -72,14 +75,16 @@ pytest tests/test_ingestion.py -v
 
 ### System Flow
 
-1. **Ingestion Pipeline** (`scripts/ingest_pdfs.py`): PDFs → text chunks + images + embeddings
-2. **Vector Database** (ChromaDB): Stores text chunks with embeddings for semantic search
-3. **SQLite Database**: Stores document metadata, page info, and mock ticket data
+1. **Ingestion Pipeline** (`scripts/ingest_pdfs_v2.py`): PDFs → vision extraction → structured data + chunks + embeddings
+2. **Vector Database** (ChromaDB): Stores chunk text + embeddings (both dense search and BM25 read from here)
+3. **SQLite Database**: Stores equipment/instrument/connection metadata
 4. **Query Router** (`app/query_router.py`): Routes queries to RAG or Vision based on keywords
-5. **RAG Engine** (`app/rag_engine.py`): Vector search + context assembly + LLM generation
-6. **Vision Engine** (`app/vision_engine.py`): Image analysis for spatial/visual queries
-7. **LLM Adapter** (`app/llm_adapter.py`): Unified interface for multiple LLM providers (Gemini, OpenAI, Claude)
-8. **Streamlit UI** (`app/main.py`): Chat interface with token tracking and cost monitoring
+5. **RAG Engine** (`app/rag_engine.py`): Retrieval + context assembly + LLM generation
+6. **Hybrid Retriever** (`app/hybrid_retriever.py`): BM25 + RRF fusion; `RETRIEVAL_MODE=vector|hybrid`
+7. **Vision Engine** (`app/vision_engine.py`): Image analysis for spatial/visual queries
+8. **LLM Adapter** (`app/llm_adapter.py`): Multi-provider interface (Gemini, OpenAI, Claude, **OpenRouter**)
+9. **API Service** (`api/main.py`): FastAPI — routes, engines, serves `static/index.html`
+10. **Frontend** (`static/index.html`): fetch-driven SPA; **legacy** Streamlit at `app/main.py`
 
 ### Key Data Flows
 
@@ -100,14 +105,18 @@ pytest tests/test_ingestion.py -v
 
 ### Core Engines
 - **Query routing logic**: `app/query_router.py:route_query()` — keyword-based routing
-- **RAG implementation**: `app/rag_engine.py` — vector search and context assembly
+- **RAG implementation**: `app/rag_engine.py` — retrieval (vector/hybrid) + context assembly
+- **Hybrid retriever**: `app/hybrid_retriever.py` — Okapi BM25 + tag-aware tokenizer + RRF fusion
 - **Vision implementation**: `app/vision_engine.py` — image loading and vision API integration
-- **LLM provider abstraction**: `app/llm_adapter.py` — `call_llm()` function handles all providers with token tracking
+- **LLM provider abstraction**: `app/llm_adapter.py` — `call_llm()` handles all providers incl. OpenRouter, with token tracking
+- **Model config**: `config/models.json` — model line-ups for the eval matrices
 
-### UI & Data
-- **Main Streamlit app**: `app/main.py` — chat interface, session state management
+### API & UI & Data
+- **API service**: `api/main.py` (routes, engine init) + `api/schemas.py` (typed I/O)
+- **Frontend**: `static/index.html` — fetch-driven SPA (primary UI)
+- **Legacy Streamlit app**: `app/main.py`
 - **Mock ticket data**: `app/mock_data.py` — hardcoded maintenance records
-- **PDF ingestion**: `scripts/ingest_pdfs.py` — PyMuPDF text/image extraction, chunking, embedding generation
+- **PDF ingestion**: `scripts/ingest_pdfs_v2.py` — vision extraction, chunking, embedding generation
 
 ### Token Tracking
 - **Logging function**: `app/llm_adapter.py:log_usage()` — prints to console and writes to `logs/query_log.jsonl`
