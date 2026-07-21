@@ -370,7 +370,7 @@ function appendAnswer(data){
     <div class="a-text">${mdToHtml(data.answer)}</div>
     ${img}${tk}
     <div class="meta">
-      <button class="citebtn" onclick="this.classList.toggle('open');document.getElementById('src-${id}').classList.toggle('open')">
+      <button class="citebtn" onclick="this.classList.toggle('open');document.getElementById('src-${id}').classList.toggle('open');setTimeout(()=>{document.getElementById('chat').scrollTop=1e9},60)">
         <span class="ci">📄</span><span><span class="cite-main">${c.main}</span>${c.more}</span><span class="chev2">▸</span></button>
       <div class="fb"><button onclick="fb(this,1)" title="Helpful">👍</button><button onclick="fb(this,0)" title="Not helpful">👎</button></div>
     </div>
