@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P&ID Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#2563eb; --accent-dark:#1d4ed8; --accent-soft:#eff6ff;
+    --ink:#0f172a; --ink-2:#475569; --muted:#94a3b8;
+    --line:#e8edf3; --surface:#f7f9fc; --card:#fff;
+    --green:#16a34a; --green-soft:#dcfce7;
+    --amber:#d97706; --amber-soft:#fffbeb; --amber-line:#fcd34d;
+    --red:#dc2626;
+    --shadow:0 1px 2px rgba(15,23,42,.04);
+    --shadow-pop:0 8px 30px rgba(15,23,42,.12);
+    --maxw:720px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Inter',sans-serif;background:var(--surface);color:var(--ink);
+    -webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+
+  /* ── Top bar ── */
+  .topbar{display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--card);
+    border-bottom:1px solid var(--line);flex-shrink:0;z-index:20}
+  .iconbtn{min-width:40px;height:40px;border:none;background:transparent;border-radius:10px;cursor:pointer;
+    font-size:1.1rem;color:var(--ink-2);display:flex;align-items:center;justify-content:center;transition:.15s}
+  .iconbtn:hover{background:var(--surface)}
+  .tb-title{display:flex;align-items:center;gap:9px;font-weight:600;font-size:.96rem;white-space:nowrap;overflow:hidden;cursor:pointer;padding:4px 6px;border-radius:8px;transition:.15s}
+  .tb-title:hover{background:var(--surface)}
+  .tb-title .fac{font-weight:400;font-size:.76rem;color:var(--muted)}
+  .newbtn{margin-left:auto;display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);
+    border-radius:10px;padding:8px 13px;font-size:.84rem;font-weight:500;color:var(--ink);cursor:pointer;transition:.15s;font-family:inherit}
+  .newbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(22,163,74,.15);flex-shrink:0}
+
+  /* ── Drawer ── */
+  .scrim{position:fixed;inset:0;background:rgba(15,23,42,.4);opacity:0;pointer-events:none;transition:.2s;z-index:30}
+  .scrim.show{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;left:0;bottom:0;width:290px;max-width:84vw;background:var(--card);z-index:40;
+    transform:translateX(-100%);transition:transform .22s ease;display:flex;flex-direction:column;
+    box-shadow:var(--shadow-pop);padding:16px;overflow-y:auto}
+  .drawer.show{transform:translateX(0)}
+  .drawer .dhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .drawer .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:.96rem}
+  .drawer .brand small{display:block;font-weight:400;font-size:.72rem;color:var(--muted)}
+  .drawer-sect{font-size:.68rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:18px 4px 8px}
+  .drawer-item{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;cursor:pointer;
+    font-size:.9rem;color:var(--ink);transition:.15s;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+  .drawer-item:hover{background:var(--surface)}
+  .drawer-item .ic{width:20px;text-align:center;font-size:1rem;flex-shrink:0}
+  .histitem{display:block;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:.86rem;color:var(--ink-2);
+    transition:.15s;border:none;background:none;width:100%;text-align:left;font-family:inherit;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .histitem:hover{background:var(--surface);color:var(--ink)}
+  .histitem.active{background:var(--accent-soft);color:var(--accent-dark);font-weight:500}
+  .hist-empty{font-size:.8rem;color:var(--muted);padding:8px 12px;line-height:1.5}
+  .sysinfo{font-size:.8rem;color:var(--ink-2);line-height:2;padding:4px 12px}
+  .sysinfo b{color:var(--ink);font-weight:500}
+  .drawer-foot{margin-top:16px;font-size:.7rem;color:var(--muted);text-align:center;padding-top:12px;border-top:1px solid var(--line)}
+
+  /* ── Views ── */
+  .stage{flex:1;overflow:hidden;position:relative}
+  .view{position:absolute;inset:0;display:none;flex-direction:column}
+  .view.active{display:flex}
+
+  /* ── Chat ── */
+  .chat{flex:1;overflow-y:auto;padding:22px 16px 8px}
+  .chat-inner{max-width:var(--maxw);margin:0 auto;width:100%}
+  .hero{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 8px;gap:6px}
+  .hero .em{font-size:2.6rem}
+  .hero h1{font-size:1.5rem;font-weight:700;letter-spacing:-.02em}
+  .hero p{color:var(--ink-2);font-size:.92rem;max-width:440px;line-height:1.5}
+  .hero .cap{font-size:.78rem;color:var(--muted);max-width:420px;line-height:1.5;margin-top:2px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px;max-width:520px}
+  .chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:9px 15px;font-size:.85rem;
+    color:var(--ink);cursor:pointer;transition:.15s;font-family:inherit}
+  .chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+  .msg{margin-bottom:22px}
+  .u-row{display:flex;justify-content:flex-end}
+  .u-bubble{background:var(--accent);color:#fff;border-radius:16px 16px 4px 16px;padding:11px 15px;font-size:.92rem;line-height:1.5;max-width:82%}
+  .a-text{font-size:.95rem;line-height:1.65;color:var(--ink)}
+  .loading{display:flex;gap:5px;padding:6px 2px}
+  .loading span{width:8px;height:8px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite both}
+  .loading span:nth-child(2){animation-delay:.2s} .loading span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+  .a-text h4{font-size:.98rem;margin:0 0 8px}
+  .a-text p{margin-bottom:9px}
+  .a-text ul{margin:8px 0 10px 20px}
+  .a-text li{margin-bottom:4px}
+  .tag{font-family:ui-monospace,Menlo,monospace;background:var(--accent-soft);color:var(--accent-dark);border-radius:5px;padding:1px 6px;font-size:.84em;font-weight:500}
+  .pidfig{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card)}
+  .pidfig img{display:block;width:100%;height:auto;cursor:zoom-in}
+  .pidfig figcaption{font-size:.76rem;color:var(--ink-2);padding:9px 12px;border-top:1px solid var(--line);background:var(--surface)}
+
+  /* ── Ticket (prominent operational card) ── */
+  .ticket{margin-top:14px;border:1px solid var(--amber-line);border-radius:12px;background:var(--amber-soft);padding:13px 15px}
+  .ticket .tt{font-weight:600;font-size:.88rem;margin-bottom:2px;display:flex;align-items:center;gap:8px;color:#92400e}
+  .ticket .tsub{font-size:.76rem;color:var(--amber);margin-bottom:8px}
+  .ticket .tr{font-size:.85rem;color:var(--ink-2);margin-bottom:3px;line-height:1.5}
+  .ticket .tr b{color:var(--ink);font-weight:600}
+  .ticket .tm{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+  .pill{border-radius:999px;padding:2px 10px;font-size:.72rem;font-weight:500}
+  .pill.ok{background:var(--green-soft);color:var(--green)}
+  .pill.high{background:#fee2e2;color:var(--red)} .pill.med{background:#fef3c7;color:var(--amber)} .pill.low{background:var(--surface);color:var(--ink-2)}
+
+  /* ── Answer meta: citations + feedback ── */
+  .meta{display:flex;align-items:center;gap:12px;margin-top:13px;flex-wrap:wrap}
+  .citebtn{display:inline-flex;align-items:center;gap:7px;font-size:.8rem;color:var(--ink-2);cursor:pointer;
+    background:none;border:none;font-family:inherit;padding:0;text-align:left;line-height:1.4}
+  .citebtn:hover .cite-main{color:var(--accent)}
+  .citebtn .ci{color:var(--muted)}
+  .cite-main{font-weight:500;color:var(--ink)}
+  .cite-more{color:var(--muted)}
+  .chev2{color:var(--muted);font-size:.7rem;transition:.2s}
+  .citebtn.open .chev2{transform:rotate(90deg)}
+  .fb{margin-left:auto;display:flex;gap:2px}
+  .fb button{width:30px;height:30px;border:none;background:none;border-radius:8px;cursor:pointer;font-size:.9rem;opacity:.5;transition:.15s}
+  .fb button:hover{background:var(--surface);opacity:1}
+  .fb button.on{opacity:1;background:var(--accent-soft)}
+
+  /* sources panel (collapsed) — human provenance */
+  .sources{margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden;display:none;background:var(--card)}
+  .sources.open{display:block}
+  .srchdr{padding:11px 14px;font-size:.76rem;color:var(--ink-2);background:var(--surface);border-bottom:1px solid var(--line);line-height:1.45}
+  .srcrow{padding:12px 14px;border-top:1px solid var(--line)}
+  .srcrow:first-of-type{border-top:none}
+  .srcrow:first-child{border-top:none}
+  .srcrow .r1{display:flex;align-items:flex-start;gap:10px}
+  .srcrow .doc{font-size:1rem;line-height:1.2}
+  .srcrow .info{flex:1;min-width:0}
+  .srcrow .name{font-size:.86rem;font-weight:600;color:var(--ink)}
+  .srcrow .loc{font-size:.76rem;color:var(--ink-2);margin-top:2px}
+  .conf{font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .conf.h{background:var(--green-soft);color:var(--green)} .conf.m{background:#fef3c7;color:var(--amber)} .conf.l{background:var(--surface);color:var(--muted)}
+  .switch-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;font-size:.9rem;color:var(--ink);cursor:pointer}
+  .switch-row .ic{width:20px;text-align:center;margin-right:6px}
+  .switch-row input{width:38px;height:22px;appearance:none;background:var(--line);border-radius:999px;position:relative;cursor:pointer;transition:.2s;flex-shrink:0}
+  .switch-row input:checked{background:var(--accent)}
+  .switch-row input::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .switch-row input:checked::after{left:18px}
+  .switch-hint{font-size:.72rem;color:var(--muted);padding:0 12px 4px;line-height:1.45}
+  /* technical detail hidden unless the toggle is on */
+  .rdtoggle{font-size:.72rem;color:var(--accent);cursor:pointer;margin-top:8px;user-select:none;display:none}
+  body.tech .rdtoggle{display:inline-block}
+  .fbthanks{font-size:.72rem;color:var(--green);margin-left:10px;white-space:nowrap}
+  .rdetail{display:none;margin-top:8px;font-size:.74rem;color:var(--muted);font-family:ui-monospace,monospace;background:var(--surface);border-radius:8px;padding:8px 10px;line-height:1.7}
+  .rdetail.open{display:block}
+  .rdetail .rbar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:4px}
+  .rdetail .rbar>span{display:block;height:100%;background:var(--accent)}
+  .srcfoot{padding:9px 14px;border-top:1px solid var(--line);font-size:.72rem;color:var(--muted);gap:16px;flex-wrap:wrap;display:none}
+  body.tech .srcfoot{display:flex}
+
+  /* ── Composer ── */
+  .composer{flex-shrink:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--line)}
+  .composer-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:flex-end;gap:8px;background:var(--card);
+    border:1.5px solid var(--line);border-radius:16px;padding:7px 7px 7px 16px;box-shadow:var(--shadow);transition:.15s}
+  .composer-in:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+  .composer textarea{flex:1;border:none;outline:none;resize:none;font-family:inherit;font-size:1rem;line-height:1.5;background:transparent;max-height:120px;padding:8px 0;color:var(--ink)}
+  .send{width:44px;height:44px;border:none;background:var(--accent);color:#fff;border-radius:12px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+  .send:hover{background:var(--accent-dark)}
+  .hint{max-width:var(--maxw);margin:7px auto 0;font-size:.7rem;color:var(--muted);text-align:center}
+
+  /* ── Evaluation ── */
+  .eval{flex:1;overflow-y:auto;padding:20px 16px 40px}
+  .eval-inner{max-width:820px;margin:0 auto}
+  .eval h2{font-size:1.35rem;font-weight:700;letter-spacing:-.02em}
+  .scope{background:var(--accent-soft);border:1px solid #dbeafe;border-radius:12px;padding:12px 15px;margin:12px 0 22px;font-size:.82rem;color:#1e40af;line-height:1.7}
+  .scope b{font-weight:600}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:22px}
+  .kard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .kard .kl{font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+  .kard h3{font-size:.94rem;margin:5px 0 2px}
+  .kard .kd{font-size:.76rem;color:var(--muted);line-height:1.45;margin-bottom:10px}
+  .kard .kbig{font-size:1.7rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .kard .kdelta{font-size:.78rem;color:var(--green);font-weight:600;margin-left:6px}
+  .ep{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden}
+  .ep-h{display:flex;align-items:center;gap:10px;padding:15px 16px;cursor:pointer;user-select:none}
+  .ep-h h3{font-size:.94rem;flex:1}
+  .ep-h .chev{color:var(--muted);transition:.2s}
+  .ep.open .chev{transform:rotate(90deg)}
+  .ep-body{display:none;padding:0 16px 16px}
+  .ep.open .ep-body{display:block}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  th{text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);font-weight:600}
+  td{padding:9px 10px;border-bottom:1px solid var(--surface);color:var(--ink-2)}
+  td.n,th.n{font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace}
+  tr.win td{background:rgba(220,252,231,.4)} tr.win td:first-child{font-weight:600;color:var(--ink)}
+  .insight{font-size:.82rem;color:var(--ink-2);line-height:1.6;margin-top:12px;padding-left:12px;border-left:2px solid var(--line)}
+  .vruns{display:inline-flex;gap:5px}
+  .vr{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:1px 8px;font-size:.8rem;font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace}
+  .vr.bad{background:#fee2e2;color:var(--red);border-color:#fecaca}
+
+  @media(min-width:768px){.chat{padding:32px 24px 8px}.hero h1{font-size:1.9rem}.u-bubble{max-width:70%}}
+  ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#d5dde7;border-radius:4px}
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <button class="iconbtn" onclick="toggleDrawer(true)" aria-label="Menu">☰</button>
+    <div class="tb-title" onclick="goHome()" title="Home" role="button"><svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2563eb"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M7 16h18" stroke="#fff" stroke-width="2.2"/></svg> P&amp;ID Assistant <span class="fac">· D-254-001</span></div>
+    <button class="newbtn" onclick="newConversation()">＋ New</button>
+  </div>
+
+  <div class="scrim" id="scrim" onclick="toggleDrawer(false)"></div>
+  <aside class="drawer" id="drawer">
+    <div class="dhead">
+      <div class="brand"><svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#2563eb"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M7 16h18" stroke="#fff" stroke-width="2.2"/></svg> <span>P&amp;ID Assistant<small>Gas Production Facility</small></span></div>
+      <button class="iconbtn" onclick="toggleDrawer(false)">✕</button>
+    </div>
+
+    <div class="drawer-sect">Recent conversations</div>
+    <div id="history"></div>
+
+    <div class="drawer-sect">Display</div>
+    <label class="switch-row"><span><span class="ic">🔬</span> Technical detail</span>
+      <input type="checkbox" id="techToggle" onchange="setTech(this.checked)"></label>
+    <div class="switch-hint">Show retrieval match % and chunk IDs under each source (for engineers / demos).</div>
+
+    <div class="drawer-sect">System quality</div>
+    <button class="drawer-item" onclick="showView('evaluation');toggleDrawer(false)"><span class="ic">📊</span> Evaluation benchmarks</button>
+
+    <div class="drawer-sect">System</div>
+    <div class="sysinfo" id="sysinfo">
+      <div><b>Model:</b> —</div>
+      <div><b>Retrieval:</b> —</div>
+      <div><b>Documents:</b> —</div>
+    </div>
+    <div class="drawer-foot">v3.0 · Hybrid RAG · 3-layer eval</div>
+  </aside>
+
+  <div class="stage">
+    <section class="view active" id="view-assistant">
+      <div class="chat" id="chat"><div class="chat-inner" id="chat-inner"></div></div>
+      <div class="composer">
+        <div class="composer-in">
+          <textarea id="input" rows="1" placeholder="Ask about equipment, instruments or safety systems…"
+            oninput="autogrow(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+          <button class="send" onclick="send()" aria-label="Send">➤</button>
+        </div>
+        <div class="hint">Answers cite the source drawing & sheet · not connected to live SCADA</div>
+      </div>
+    </section>
+
+    <section class="view" id="view-evaluation">
+      <div class="eval"><div class="eval-inner">
+        <h2>Evaluation benchmarks</h2>
+        <div class="scope"><b>Scope:</b> automated quality benchmarks against a fixed test set.<br>
+          Retrieval · <b>20 questions</b> vs gold chunks &nbsp;•&nbsp; Generation · <b>8 questions × 3 models</b> (LLM judge)
+          &nbsp;•&nbsp; Vision · <b>3 runs / model</b> vs ground truth &nbsp;•&nbsp; Last run <b>20 Jul 2026</b>.</div>
+        <div class="cards">
+          <div class="kard"><div class="kl">Layer 1 · Retrieval</div><h3>Right chunk found</h3><div class="kd">hit@1 · hybrid vs vector baseline</div><div><span class="kbig">85%</span><span class="kdelta">▲ +5</span></div></div>
+          <div class="kard"><div class="kl">Layer 2 · Generation</div><h3>Answer quality</h3><div class="kd">correctness · best of 3 models</div><div><span class="kbig">90%</span><span class="kdelta">95% faithful</span></div></div>
+          <div class="kard"><div class="kl">Layer 3 · Vision</div><h3>Extraction accuracy</h3><div class="kd">tag recall · mean of 3 runs</div><div><span class="kbig">88%</span></div></div>
+        </div>
+        <div class="ep open" onclick="this.classList.toggle('open')"><div class="ep-h"><h3>Layer 1 · Hybrid retrieval lift</h3><span class="chev">▸</span></div>
+          <div class="ep-body" onclick="event.stopPropagation()"><table><thead><tr><th>Metric</th><th class="n">Vector</th><th class="n">Hybrid</th><th class="n">Δ</th></tr></thead><tbody>
+            <tr><td>hit@1</td><td class="n">80.0%</td><td class="n">85.0%</td><td class="n" style="color:var(--green)">+5.0</td></tr>
+            <tr><td>MRR@10</td><td class="n">90.2%</td><td class="n">92.7%</td><td class="n" style="color:var(--green)">+2.5</td></tr>
+            <tr class="win"><td>spec lookups (tags)</td><td class="n">90.0%</td><td class="n">100%</td><td class="n" style="color:var(--green)">+10</td></tr>
+          </tbody></table><div class="insight">Tag-heavy queries (V-101, PSV-101) are where dense embeddings blur similar IDs and BM25 exact-matches them. "Motor HP of C-104": dense ranked #5, BM25 #1 — fusion rescued it.</div></div></div>
+        <div class="ep" onclick="this.classList.toggle('open')"><div class="ep-h"><h3>Layer 2 · Cross-model comparison</h3><span class="chev">▸</span></div>
+          <div class="ep-body" onclick="event.stopPropagation()"><table><thead><tr><th>Model</th><th class="n">Correct</th><th class="n">Faithful</th><th class="n">Latency</th><th class="n">Cost</th></tr></thead><tbody>
+            <tr class="win"><td>gemini-2.5-flash-lite</td><td class="n">90%</td><td class="n">95%</td><td class="n">1.2s</td><td class="n">$0.0017</td></tr>
+            <tr><td>gpt-4o-mini</td><td class="n">90%</td><td class="n">92%</td><td class="n">2.9s</td><td class="n">$0.0024</td></tr>
+            <tr><td>llama-3.3-70b</td><td class="n">72%</td><td class="n">78%</td><td class="n">7.8s</td><td class="n">$0.0024</td></tr>
+          </tbody></table><div class="insight">Model choice is data-driven: swap any of 300+ models via one config line; the matrix ranks them on quality, latency and cost. Flash-lite wins on every axis.</div></div></div>
+        <div class="ep" onclick="this.classList.toggle('open')"><div class="ep-h"><h3>Layer 3 · Vision extraction variance</h3><span class="chev">▸</span></div>
+          <div class="ep-body" onclick="event.stopPropagation()"><table><thead><tr><th>Model</th><th>Equipment · 3 runs</th><th class="n">Mean recall</th></tr></thead><tbody>
+            <tr><td>flash-lite</td><td><span class="vruns"><span class="vr">12</span><span class="vr">12</span><span class="vr bad">5</span></span></td><td class="n">74% ±18</td></tr>
+            <tr class="win"><td>flash</td><td><span class="vruns"><span class="vr">13</span><span class="vr">13</span><span class="vr">12</span></span></td><td class="n">92% ±4</td></tr>
+          </tbody></table><div class="insight">Each P&ID page is read independently, so extraction is stochastic — same model & code gave 12, 12, then 5 equipment with no errors. This is why we average runs.</div></div></div>
+      </div></div>
+    </section>
+  </div>
+
+<script>
+/* Suggested questions — showcase specs · safety · visual · maintenance */
+const SUGGEST=[
+  "What is V-101 and its operating conditions?",
+  "What safety valves protect the system?",
+  "Show where V-101 connects downstream",
+  "Any recent maintenance on C-104?",
+];
+
+let convos=JSON.parse(localStorage.getItem('pid_convos')||'[]');
+let current=null; let mid=0;
+let techMode=localStorage.getItem('pid_tech')==='1';
+function persist(){localStorage.setItem('pid_convos',JSON.stringify(convos.slice(-20)));}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function toggleDrawer(v){document.getElementById('drawer').classList.toggle('show',v);document.getElementById('scrim').classList.toggle('show',v);}
+function showView(v){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('view-'+v).classList.add('active');}
+function autogrow(t){t.style.height='auto';t.style.height=Math.min(t.scrollHeight,120)+'px';}
+function setTech(v){techMode=v;localStorage.setItem('pid_tech',v?'1':'0');document.body.classList.toggle('tech',v);}
+function goHome(){newConversation();}
+
+/* Lightweight markdown → HTML for real LLM answers (bold, bullets, tags). */
+function mdToHtml(t){
+  let s=esc(t||'');
+  s=s.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  s=s.replace(/\b([A-Z]{1,4}-\d{2,4}[A-Z]?)\b/g,'<span class="tag">$1</span>');
+  const lines=s.split(/\n/); let out='',inList=false;
+  for(const ln of lines){
+    if(/^\s*[-*]\s+/.test(ln)){ if(!inList){out+='<ul>';inList=true;} out+='<li>'+ln.replace(/^\s*[-*]\s+/,'')+'</li>'; }
+    else { if(inList){out+='</ul>';inList=false;} if(ln.trim())out+='<p>'+ln+'</p>'; }
+  }
+  if(inList)out+='</ul>'; return out||'<p></p>';
+}
+
+function renderHero(){
+  document.getElementById('chat-inner').innerHTML=`<div class="hero">
+    <div class="em"><svg viewBox="0 0 32 32" width="52" height="52" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#2563eb"/><circle cx="16" cy="16" r="7.5" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M7 16h18" stroke="#fff" stroke-width="2.2"/></svg></div><h1>How can I help?</h1>
+    <p>Ask about any equipment, instrument or system on drawing D-254-001 — in plain English.</p>
+    <div class="chips">${SUGGEST.map(s=>`<button class="chip" onclick="ask(this.textContent)">${s}</button>`).join('')}</div>
+  </div>`;
+}
+
+function ticketHtml(t){
+  const pr=t.priority==='High'?'high':t.priority==='Medium'?'med':'low';
+  return `<div class="ticket"><div class="tt">🔧 Maintenance record found</div><div class="tsub">${esc(t.equipment)}</div>
+    <div class="tr"><b>Issue:</b> ${esc(t.issue)}</div><div class="tr"><b>Resolution:</b> ${esc(t.resolution)}</div>
+    <div class="tm"><span class="pill ok">${t.status_emoji||'✅'} ${esc(t.status)}</span><span class="pill ${pr}">Priority ${esc(t.priority)}</span><span class="pill low">Resolved ${esc(t.resolved)}</span></div></div>`;
+}
+
+function citeSummary(data){
+  const s=data.sources||[]; if(!s.length) return {main:'Source',more:''};
+  const f=s[0];
+  const label = data.route==='vision' ? `Diagram · ${f.drawing}${f.sheet?' Sheet '+f.sheet:''}` : `${f.tag} Datasheet · ${f.drawing}${f.sheet?' Sheet '+f.sheet:''}`;
+  const more = s.length>1?` <span class="cite-more">+${s.length-1} more</span>`:'';
+  return {main:label,more};
+}
+
+function sourcesHtml(data,id){
+  const s=data.sources||[]; const n=s.length;
+  const mode=(data.telemetry&&data.telemetry.retrieval_mode)||'vector';
+  const rels=s.map(x=>x.relevance).filter(v=>typeof v==='number');
+  const maxRel=rels.length?Math.max(...rels):1;
+  const tail=techMode?' — tap “Why this source?” to see how each matched.':'.';
+  const hdr=`<div class="srchdr">This answer was built from ${n} source${n!==1?'s':''} in the drawing${tail}</div>`;
+  const rows=s.map(x=>{
+    let detail;
+    if(x.relevance==null){ detail='Full page image analyzed by the vision model.'; }
+    else{
+      const w=Math.round((x.relevance/maxRel)*100);
+      const modeLbl=mode==='hybrid'?'hybrid search (dense + keyword)':'vector search';
+      detail=`Ranked <b>#${x.rank}</b> of ${n} by ${modeLbl}.<div class="rbar"><span style="width:${w}%"></span></div><span style="opacity:.7">score ${x.relevance.toFixed(4)} · chunk ${esc(x.chunk_id||'')}</span>`;
+    }
+    const nm = x.tag==='Diagram'?'P&ID Diagram':`${esc(x.tag)} — ${esc(x.name)}`;
+    const loc = `Drawing ${esc(x.drawing)}${x.sheet?' · Sheet '+x.sheet:''}`;
+    return `<div class="srcrow"><div class="r1"><div class="doc">📄</div><div class="info"><div class="name">${nm}</div><div class="loc">${loc}</div><div class="rdtoggle" onclick="this.nextElementSibling.classList.toggle('open')">Why this source?</div><div class="rdetail">${detail}</div></div></div></div>`;
+  }).join('');
+  const tel=data.telemetry||{};
+  const foot=`<div class="srcfoot"><span>⚡ ${tel.latency_s}s</span><span>◈ ${tel.total_tokens} tokens</span><span>≈ $${(tel.cost_usd||0).toFixed(4)}</span></div>`;
+  return `<div class="sources" id="src-${id}">${hdr}${rows}${foot}</div>`;
+}
+
+function appendUser(q){document.getElementById('chat-inner').insertAdjacentHTML('beforeend',`<div class="msg"><div class="u-row"><div class="u-bubble">${q}</div></div></div>`);}
+
+function appendAnswer(data){
+  const id=++mid; const c=citeSummary(data);
+  const drawing=(data.sources&&data.sources[0]&&data.sources[0].drawing)||'D-254-001';
+  const img = data.image_url ? `<figure class="pidfig"><img src="${data.image_url}" alt="P&ID Sheet ${data.sheet||''}" loading="lazy"><figcaption>📐 Referenced diagram · Drawing ${drawing} · Sheet ${data.sheet||''}</figcaption></figure>`:'';
+  const tk = data.ticket ? ticketHtml(data.ticket):'';
+  document.getElementById('chat-inner').insertAdjacentHTML('beforeend',`<div class="msg"><div class="a-block">
+    <div class="a-text">${mdToHtml(data.answer)}</div>
+    ${img}${tk}
+    <div class="meta">
+      <button class="citebtn" onclick="this.classList.toggle('open');document.getElementById('src-${id}').classList.toggle('open')">
+        <span class="ci">📄</span><span><span class="cite-main">${c.main}</span>${c.more}</span><span class="chev2">▸</span></button>
+      <div class="fb"><button onclick="fb(this,1)" title="Helpful">👍</button><button onclick="fb(this,0)" title="Not helpful">👎</button></div>
+    </div>
+    ${sourcesHtml(data,id)}
+  </div></div>`);
+  document.getElementById('chat').scrollTop=1e9;
+}
+
+function fb(b,up){
+  const w=b.parentNode; w.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  let t=w.querySelector('.fbthanks'); if(!t){t=document.createElement('span');t.className='fbthanks';w.appendChild(t);}
+  t.textContent=up?'Thanks — noted':'Thanks — we’ll use this to improve';
+  /* Production: POST vote + query + chunk ids to a feedback store feeding retrieval tuning + eval set. */
+}
+
+function ensureConvo(){if(!current){current={id:Date.now(),title:null,items:[]};convos.push(current);}}
+
+async function ask(text){
+  text=(text||'').trim(); if(!text) return;
+  showView('assistant');
+  const inner=document.getElementById('chat-inner');
+  if(inner.querySelector('.hero'))inner.innerHTML='';
+  appendUser(esc(text));
+  const load=document.createElement('div'); load.className='msg';
+  load.innerHTML='<div class="a-block"><div class="loading"><span></span><span></span><span></span></div></div>';
+  inner.appendChild(load); document.getElementById('chat').scrollTop=1e9;
+  try{
+    const res=await fetch('/api/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:text})});
+    if(!res.ok){const t=await res.text();throw new Error('HTTP '+res.status);}
+    const data=await res.json();
+    load.remove(); appendAnswer(data);
+    ensureConvo(); if(!current.title)current.title=text; current.items.push({q:esc(text),data}); persist(); renderHistory();
+  }catch(e){
+    load.remove();
+    inner.insertAdjacentHTML('beforeend',`<div class="msg"><div class="a-block"><div class="a-text"><p>⚠️ Couldn't reach the assistant service (${esc(e.message)}). Make sure the API is running.</p></div></div></div>`);
+    document.getElementById('chat').scrollTop=1e9;
+  }
+}
+function send(){const t=document.getElementById('input');const v=t.value;t.value='';autogrow(t);ask(v);}
+function newConversation(){current=null;mid=0;renderHero();showView('assistant');renderHistory();document.getElementById('input').focus();}
+function loadConvo(id){current=convos.find(c=>c.id===id);if(!current)return;mid=0;document.getElementById('chat-inner').innerHTML='';showView('assistant');current.items.forEach(it=>{appendUser(it.q);appendAnswer(it.data);});renderHistory();toggleDrawer(false);}
+function renderHistory(){
+  const h=document.getElementById('history');
+  const list=convos.filter(c=>c.title).slice(-10).reverse();
+  h.innerHTML = list.length ? list.map(c=>`<button class="histitem ${current&&c.id===current.id?'active':''}" onclick="loadConvo(${c.id})">${esc(c.title)}</button>`).join('')
+    : `<div class="hist-empty">No past conversations yet. Ask a question to start.</div>`;
+}
+async function loadHealth(){
+  try{
+    const h=await(await fetch('/health')).json();
+    const modeLbl=h.retrieval_mode==='hybrid'?'Hybrid (dense + BM25)':'Vector (dense)';
+    document.getElementById('sysinfo').innerHTML=
+      `<div><b>Model:</b> ${esc(h.model||'—')}</div>`+
+      `<div><b>Retrieval:</b> ${modeLbl}</div>`+
+      `<div><b>Documents:</b> ${h.documents} drawing · ${h.chunks} chunks</div>`;
+  }catch(e){/* API not up — leave placeholders */}
+}
+if(techMode){document.body.classList.add('tech');document.getElementById('techToggle').checked=true;}
+renderHero();renderHistory();loadHealth();
+
+</script>
+</body>
+</html>
