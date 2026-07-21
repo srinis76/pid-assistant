@@ -8,49 +8,63 @@ The P&ID Assistant combines Retrieval Augmented Generation (RAG) with vision-ena
 
 ### Key Features
 
-- Natural language query interface
-- Vision-enabled P&ID understanding
-- Hybrid RAG + Vision API architecture
-- Multi-LLM provider support (Gemini Flash, GPT-4o mini, Claude Sonnet)
-- Token usage tracking and cost monitoring
-- Mock maintenance ticket display
+- Natural language query interface with source citations (drawing + sheet)
+- **Hybrid retrieval** — dense vectors + BM25 lexical, fused with Reciprocal Rank Fusion (tag-precise for P&ID identifiers like `V-101`, `PSV-101`)
+- Vision-enabled P&ID understanding (renders the referenced diagram in the answer)
+- **Provider-agnostic LLMs via OpenRouter** — swap across 300+ models with a one-line config change
+- **Three-layer evaluation harness** — retrieval (hit@K), generation (LLM-judge), and vision extraction (deterministic vs ground truth)
+- FastAPI service with a custom single-page UI (operator + engineer modes)
+- Token/latency/cost telemetry per query
+- Maintenance ticket surfacing
 
 ## Technology Stack
 
 | Layer | Technology |
 |-------|------------|
-| UI | Streamlit |
+| API / UI | FastAPI + custom single-page frontend (`static/index.html`) |
 | Backend | Python 3.11+ |
-| LLM | Gemini Flash (default), GPT-4o mini, Claude Sonnet |
+| Retrieval | Hybrid — ChromaDB (dense) + in-house BM25, fused via RRF |
+| LLM | OpenRouter (any model); native Gemini / OpenAI / Claude also supported |
 | Vector DB | ChromaDB |
 | Database | SQLite |
-| PDF Processing | PyMuPDF |
-| Embeddings | OpenAI API |
+| PDF / Vision | PyMuPDF + vision LLM extraction |
+| Embeddings | OpenAI (`text-embedding-3-small`) |
+
+> A legacy Streamlit UI (`app/main.py`) is retained; the FastAPI service (`api/main.py`) is the primary interface.
 
 ## Project Structure
 
 ```
 pid-assistant/
+├── api/                          # FastAPI service (primary interface)
+│   ├── main.py                   # App, routes, engine init, serves the UI
+│   └── schemas.py                # Typed request/response models
+├── static/
+│   └── index.html                # Single-page frontend (fetch-driven)
+├── config/
+│   └── models.json               # Model line-ups for the eval matrices
 ├── data/
 │   ├── pdfs/                     # Source P&ID PDF files
 │   └── processed/                # Extracted page images
 ├── database/
-│   ├── assets.db                 # SQLite database
+│   ├── assets.db                 # SQLite (equipment, instruments, connections)
 │   └── vector_store/             # ChromaDB directory
-├── logs/
-│   └── query_log.jsonl           # Query and cost logs
 ├── scripts/
-│   ├── init_database.py          # Database initialization
-│   ├── init_chromadb.py          # ChromaDB initialization
-│   └── ingest_pdfs.py            # PDF ingestion script
+│   ├── init_database.py          # SQLite schema
+│   ├── init_chromadb.py          # ChromaDB init
+│   ├── ingest_pdfs_v2.py         # Vision-based ingestion pipeline
+│   ├── eval_retrieval.py         # Layer 1 — retrieval hit@K / MRR (--mode vector|hybrid)
+│   ├── eval_matrix.py            # Layer 2 — cross-model generation matrix (LLM judge)
+│   └── eval_vision_matrix.py     # Layer 3 — vision extraction vs ground truth (--runs N)
 ├── app/
-│   ├── main.py                   # Streamlit UI entry point
-│   ├── query_router.py           # Query routing logic
-│   ├── rag_engine.py             # RAG implementation
+│   ├── rag_engine.py             # Retrieval + generation
+│   ├── hybrid_retriever.py       # BM25 + RRF fusion over ChromaDB
 │   ├── vision_engine.py          # Vision query handling
-│   ├── llm_adapter.py            # LLM provider abstraction
-│   ├── mock_data.py              # Mock ticket data
-│   └── utils.py                  # Shared utilities
+│   ├── vision_extractor.py       # Structured extraction from P&ID images
+│   ├── query_router.py           # RAG vs Vision routing
+│   ├── llm_adapter.py            # Multi-provider LLM abstraction (incl. OpenRouter)
+│   ├── mock_data.py              # Maintenance ticket data
+│   └── main.py                   # Legacy Streamlit UI
 ├── requirements.txt              # Python dependencies
 └── .env                          # Environment variables (NOT in git)
 ```
@@ -100,13 +114,21 @@ Edit `.env` and add your API keys:
 
 ```bash
 # LLM Provider Configuration
-LLM_PROVIDER=gemini                    # Options: gemini, openai, claude
-LLM_MODEL=gemini-1.5-flash             # Model name
+LLM_PROVIDER=gemini                    # gemini, openai, claude, or openrouter
+LLM_MODEL=gemini-2.5-flash             # model name (or OpenRouter slug)
 
 # API Keys
 GEMINI_API_KEY=your_gemini_key_here
-OPENAI_API_KEY=your_openai_key_here    # For embeddings
-CLAUDE_API_KEY=your_claude_key_here    # Optional for finals
+OPENAI_API_KEY=your_openai_key_here    # For embeddings (always OpenAI)
+CLAUDE_API_KEY=your_claude_key_here    # Optional
+OPENROUTER_API_KEY=your_openrouter_key # Unified access to 300+ models
+
+# Retrieval
+RETRIEVAL_MODE=hybrid                  # vector (dense only) or hybrid (dense + BM25 via RRF)
+HYBRID_CANDIDATE_K=10                  # candidates per retriever before fusion
+HYBRID_DENSE_WEIGHT=1.0
+HYBRID_SPARSE_WEIGHT=1.0
+HYBRID_RRF_K=60
 
 # Application Settings
 ENABLE_TOKEN_TRACKING=true
@@ -142,25 +164,29 @@ For testing, use the sample document:
 ### 8. Run Ingestion Pipeline
 
 ```bash
-python scripts/ingest_pdfs.py
+python scripts/ingest_pdfs_v2.py
 ```
 
 This will:
-- Extract text from each PDF page
 - Extract page images (300 DPI PNG)
-- Chunk text content
-- Generate embeddings
-- Store in ChromaDB and SQLite
+- Run vision-based extraction of equipment, instruments, and connections
+- Build equipment-centric chunks and generate embeddings
+- Store structured data in SQLite and chunks in ChromaDB
 
 Expected time: ~60-90 seconds for a 7-page PDF
 
-### 9. Start Application
+### 9. Start the Application
 
+**FastAPI service (primary):**
 ```bash
-streamlit run app/main.py
+uvicorn api.main:app --port 8000
 ```
+Open `http://localhost:8000`.
 
-The application will open in your browser at `http://localhost:8501`
+**Legacy Streamlit UI (optional):**
+```bash
+streamlit run app/main.py     # http://localhost:8501
+```
 
 ## Usage
 
@@ -182,27 +208,38 @@ The application will open in your browser at `http://localhost:8501`
 
 ### Model Switching
 
-To switch LLM providers, edit `.env`:
-
-**Default (Free) - Gemini Flash:**
+**Recommended — OpenRouter** (one interface, 300+ models). Edit `.env`:
 ```bash
-LLM_PROVIDER=gemini
-LLM_MODEL=gemini-1.5-flash
+LLM_PROVIDER=openrouter
+LLM_MODEL=google/gemini-2.5-flash-lite   # or openai/gpt-4o-mini, anthropic/claude-sonnet-4-5, ...
 ```
+Switching models is a single-line change — no code changes.
 
-**Fallback - GPT-4o mini:**
+**Native providers** are also supported directly:
 ```bash
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-4o-mini
-```
-
-**Premium Testing - Claude Sonnet:**
-```bash
-LLM_PROVIDER=claude
-LLM_MODEL=claude-sonnet-4-5-20250929
+LLM_PROVIDER=gemini   LLM_MODEL=gemini-2.5-flash
+LLM_PROVIDER=openai   LLM_MODEL=gpt-4o-mini
+LLM_PROVIDER=claude   LLM_MODEL=claude-sonnet-4-5-20250929
 ```
 
 Restart the application after changing providers.
+
+## Evaluation
+
+The system ships with a three-layer evaluation harness — each layer targets a different failure mode:
+
+```bash
+# Layer 1 — Retrieval: hit@K / MRR vs gold chunks (compare vector vs hybrid)
+python scripts/eval_retrieval.py --mode hybrid
+
+# Layer 2 — Generation: cross-model quality/latency/cost (LLM-as-judge)
+python scripts/eval_matrix.py
+
+# Layer 3 — Vision extraction: tag recall / field coverage vs ground truth
+python scripts/eval_vision_matrix.py --runs 3
+```
+
+Model line-ups for the matrices are defined in `config/models.json`. Retrieval scoring is deterministic (gold chunks / ground truth); generation is scored by a fixed LLM judge held constant across models.
 
 ## Cost Considerations
 
@@ -265,13 +302,15 @@ python scripts/init_chromadb.py
 - Check internet connection
 - Verify API service status
 
-## MVP Limitations
+## Current Limitations
 
-- **Single Document**: Supports 1 P&ID (extensible design)
-- **Simple Routing**: Keyword-based, not ML classification
-- **No Caching**: Every query hits API (cost inefficient)
-- **Local Only**: No cloud deployment
-- **Mock Tickets**: Hardcoded data, not database-driven
+- **Single Document**: operates on 1 P&ID drawing (multi-document is the next milestone)
+- **Simple Routing**: keyword-based RAG-vs-Vision, not ML classification
+- **No Caching**: every query hits the API
+- **Local Only**: no cloud deployment or auth yet
+- **Mock Tickets**: maintenance records are hardcoded, not database-driven
+
+Delivered since MVP: hybrid retrieval, OpenRouter model-agnosticism, a three-layer eval harness, and a FastAPI service with a custom UI.
 
 ## Roadmap
 
@@ -301,5 +340,5 @@ For issues and questions, please contact [Your Contact Info]
 
 ---
 
-**Last Updated**: 2025-10-19
-**Version**: 1.0 MVP
+**Last Updated**: 2026-07-20
+**Version**: 3.0
