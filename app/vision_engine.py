@@ -46,7 +46,7 @@ class VisionEngine:
         - Fallback to equipment pages if no matches
 
         Returns:
-            List of image file paths
+            List of (image_path, document_id) tuples
         """
         import re
 
@@ -66,7 +66,7 @@ class VisionEngine:
             # Search for pages containing ANY of the mentioned tags
             for tag in equipment_tags:
                 cursor.execute("""
-                    SELECT DISTINCT image_path, page_number, page_title
+                    SELECT DISTINCT image_path, page_number, page_title, document_id
                     FROM document_pages
                     WHERE text_content LIKE ? AND has_equipment = 1
                     ORDER BY page_number
@@ -86,7 +86,7 @@ class VisionEngine:
             # Fallback: Get first few equipment pages
             print(f"   ℹ️  No specific equipment found, using default pages")
             cursor.execute("""
-                SELECT image_path, page_number, page_title
+                SELECT image_path, page_number, page_title, document_id
                 FROM document_pages
                 WHERE has_equipment = 1
                 ORDER BY page_number
@@ -101,7 +101,7 @@ class VisionEngine:
             conn = sqlite3.connect(self.sqlite_db_path)
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT image_path, page_number, page_title
+                SELECT image_path, page_number, page_title, document_id
                 FROM document_pages
                 ORDER BY page_number
                 LIMIT ?
@@ -109,10 +109,8 @@ class VisionEngine:
             relevant_pages = cursor.fetchall()
             conn.close()
 
-        # Extract image paths
-        image_paths = [page[0] for page in relevant_pages]
-
-        return image_paths
+        # Extract (image_path, document_id) pairs
+        return [(page[0], page[3]) for page in relevant_pages]
 
     def load_images(self, image_paths: List[str]) -> List[str]:
         """
@@ -158,7 +156,9 @@ class VisionEngine:
         print(f"   Selecting relevant pages...")
 
         # 1. Identify relevant pages
-        page_paths = self.select_relevant_pages(query, max_pages)
+        pages_with_docs = self.select_relevant_pages(query, max_pages)
+        page_paths = [path for path, _ in pages_with_docs]
+        document_ids = [doc_id for _, doc_id in pages_with_docs]
         print(f"   ✓ Selected {len(page_paths)} pages")
 
         if not page_paths:
@@ -230,7 +230,8 @@ Answer:"""
         metadata = {
             'num_pages_analyzed': len(images),
             'page_paths': page_paths,
-            'image_paths': absolute_paths  # For display in UI
+            'image_paths': absolute_paths,  # For display in UI
+            'document_ids': document_ids    # Parallel to page_paths/image_paths
         }
 
         print(f"   ✓ Analysis complete\n")

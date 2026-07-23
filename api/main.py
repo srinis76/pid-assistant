@@ -42,6 +42,10 @@ STATIC = ROOT / "static"
 
 TICKET_KEYWORDS = ("issue", "problem", "maintenance", "recent", "ticket", "service", "fault")
 
+# Fallback drawing number when a document has no document_number in the DB
+# (single-doc MVP; see PRODUCT_SPEC known limitations).
+DEFAULT_DRAWING = "D-254-001"
+
 
 def load_drawings() -> dict:
     """Map document_id -> drawing number (best-effort; single-doc MVP)."""
@@ -49,7 +53,7 @@ def load_drawings() -> dict:
     try:
         conn = sqlite3.connect(DB_PATH)
         for did, num in conn.execute("SELECT document_id, document_number FROM documents"):
-            drawings[did] = num or "D-254-001"
+            drawings[did] = num or DEFAULT_DRAWING
         conn.close()
     except Exception:
         pass
@@ -75,7 +79,7 @@ app.add_middleware(
 
 
 def _drawing_for(doc_id) -> str:
-    return app.state.drawings.get(doc_id, "D-254-001")
+    return app.state.drawings.get(doc_id, DEFAULT_DRAWING)
 
 
 def _snapshot(adapter):
@@ -173,18 +177,20 @@ def query(req: QueryRequest):
     else:
         # Vision: cite the referenced page image(s); show the primary one.
         paths = meta.get("image_paths") or meta.get("page_paths") or []
-        pages = []
-        for p in paths:
+        doc_ids = meta.get("document_ids") or []
+        pages, page_doc_ids = [], []
+        for i, p in enumerate(paths):
             mo = re.search(r"page_(\d+)", str(p))
             if mo:
                 pages.append(int(mo.group(1)))
+                page_doc_ids.append(doc_ids[i] if i < len(doc_ids) else None)
         if pages:
             sheet = pages[0]
             image_url = f"/api/pages/{sheet}"
         for i, pg in enumerate(pages):
             sources.append(Source(
                 tag="Diagram", name="Detail P&ID (image analysis)",
-                drawing="D-254-001", sheet=pg, rank=i + 1, relevance=None, chunk_id=None,
+                drawing=_drawing_for(page_doc_ids[i]), sheet=pg, rank=i + 1, relevance=None, chunk_id=None,
             ))
 
     telemetry = Telemetry(
