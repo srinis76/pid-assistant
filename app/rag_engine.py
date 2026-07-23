@@ -137,13 +137,14 @@ class RAGEngine:
 
         return "\n---\n".join(context_parts)
 
-    def query_rag(self, query: str, top_k: int = 3) -> Tuple[str, Dict]:
+    def query_rag(self, query: str, top_k: int = 3, history: str = "") -> Tuple[str, Dict]:
         """
         Main RAG query function
 
         Args:
             query: User question
             top_k: Number of chunks to retrieve
+            history: Optional prior-conversation text block for multi-turn coherence
 
         Returns:
             Tuple of (answer, metadata)
@@ -174,9 +175,10 @@ class RAGEngine:
         print(f"   ✓ Assembled context ({len(context)} characters)")
 
         # 4. Build prompt
+        history_block = f"{history}\n\n" if history else ""
         prompt = f"""You are a technical assistant helping with P&ID (Piping and Instrumentation Diagram) documents for oil and gas operations.
 
-Context from P&ID documentation:
+{history_block}Context from P&ID documentation:
 {context}
 
 User question: {query}

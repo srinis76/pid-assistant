@@ -428,7 +428,9 @@ class LLMAdapter:
         self.session_stats['total_input_tokens'] += tokens['input_tokens']
         self.session_stats['total_output_tokens'] += tokens['output_tokens']
         self.session_stats['total_cost'] += cost
-        self.session_stats['queries_by_type'][query_type] += 1
+        # Tolerate any query_type (e.g. "rewrite") — not just the seeded rag/vision.
+        by_type = self.session_stats['queries_by_type']
+        by_type[query_type] = by_type.get(query_type, 0) + 1
 
         # Console output
         if self.verbose_logging:

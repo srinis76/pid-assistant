@@ -140,6 +140,27 @@ def create_database():
     """)
     print("✓ Created 'connections' table")
 
+    # Short-term conversation memory: one row per chat turn (see
+    # app/conversation_memory.py). Also self-created at runtime for existing DBs.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS conversation_turns (
+            turn_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id TEXT NOT NULL,
+            turn_index INTEGER NOT NULL,
+            question TEXT NOT NULL,
+            answer TEXT NOT NULL,
+            route TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    print("✓ Created 'conversation_turns' table")
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_turns_convo
+        ON conversation_turns(conversation_id, turn_index)
+    """)
+    print("✓ Created index on conversation_turns")
+
     # Create indexes for performance
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_pages_document

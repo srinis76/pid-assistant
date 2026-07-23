@@ -34,6 +34,8 @@ from app.rag_engine import RAGEngine
 from app.vision_engine import VisionEngine
 from app.query_router import QueryRouter
 from app.mock_data import get_ticket, format_ticket
+from app.conversation_memory import ConversationMemory, DEFAULT_WINDOW
+from app.query_rewriter import rewrite_followup
 from api.schemas import QueryRequest, QueryResponse, Source, Ticket, Telemetry
 
 DB_PATH = ROOT / "database" / "assets.db"
@@ -64,6 +66,7 @@ async def lifespan(app: FastAPI):
     app.state.vision = VisionEngine()
     app.state.router = QueryRouter()
     app.state.drawings = load_drawings()
+    app.state.memory = ConversationMemory(str(DB_PATH))
     print("✅ Engines ready")
     yield
 
@@ -109,7 +112,12 @@ def health():
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    # No-cache so a frontend change is never masked by a stale cached SPA shell
+    # (a cached old index.html omits conversation_id → memory silently inactive).
+    return FileResponse(
+        STATIC / "index.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/api/pages/{page}")
@@ -126,15 +134,29 @@ def page_image(page: int):
 @app.post("/api/query", response_model=QueryResponse)
 def query(req: QueryRequest):
     router: QueryRouter = app.state.router
-    route = router.route_query(req.query)
+    memory: ConversationMemory = app.state.memory
+
+    # 1. Short-term memory: recall recent turns for this conversation (opt-in).
+    turns = memory.get_recent_turns(req.conversation_id, n=DEFAULT_WINDOW) \
+        if req.conversation_id else []
+
+    # 2. Resolve follow-ups ("what connects to it?") into a standalone query so
+    #    routing and retrieval operate on explicit references. No turns => no-op.
+    rewrite_adapter = app.state.rag.llm_adapter
+    resolved = rewrite_followup(req.query, turns, rewrite_adapter) if turns else req.query
+    rewritten_query = resolved if resolved != req.query else None
+
+    route = router.route_query(resolved)
 
     # Maintenance ticket lookup (and optional prompt enrichment when relevant).
-    ticket, ticket_raw = _find_ticket(req.query)
-    prompt = req.query
-    if ticket_raw and any(w in req.query.lower() for w in TICKET_KEYWORDS):
-        prompt = (f"{req.query}\n\nNote: a maintenance ticket exists for this "
+    ticket, ticket_raw = _find_ticket(resolved)
+    prompt = resolved
+    if ticket_raw and any(w in resolved.lower() for w in TICKET_KEYWORDS):
+        prompt = (f"{resolved}\n\nNote: a maintenance ticket exists for this "
                   f"equipment — Issue: {ticket_raw['issue']}; "
                   f"Resolution: {ticket_raw['resolution']} ({ticket_raw['status']}).")
+
+    history_block = memory.format_for_prompt(turns)
 
     engine = app.state.rag if route == "rag" else app.state.vision
     adapter = engine.llm_adapter
@@ -143,9 +165,9 @@ def query(req: QueryRequest):
     t0 = time.time()
     try:
         if route == "rag":
-            answer, meta = engine.query_rag(prompt, top_k=req.top_k)
+            answer, meta = engine.query_rag(prompt, top_k=req.top_k, history=history_block)
         else:
-            answer, meta = engine.query_vision(prompt)
+            answer, meta = engine.query_vision(prompt, history=history_block)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
     latency = time.time() - t0
@@ -192,7 +214,12 @@ def query(req: QueryRequest):
         input_tokens=in_tok, output_tokens=out_tok, total_tokens=in_tok + out_tok,
         cost_usd=cost, model=adapter.model,
         retrieval_mode=getattr(engine, "retrieval_mode", "n/a"),
+        rewritten_query=rewritten_query,
     )
+
+    # Persist this turn (store the ORIGINAL user question, not the rewrite).
+    if req.conversation_id:
+        memory.add_turn(req.conversation_id, req.query, answer, route)
 
     return QueryResponse(
         answer=answer, route=route, sources=sources, ticket=ticket,
