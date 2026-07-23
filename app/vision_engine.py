@@ -142,7 +142,8 @@ class VisionEngine:
     def query_vision(
         self,
         query: str,
-        max_pages: int = 3
+        max_pages: int = 3,
+        history: str = ""
     ) -> Tuple[str, Dict]:
         """
         Main vision query function
@@ -150,6 +151,7 @@ class VisionEngine:
         Args:
             query: User question requiring visual understanding
             max_pages: Maximum number of pages to analyze
+            history: Optional prior-conversation text block for multi-turn coherence
 
         Returns:
             Tuple of (answer, metadata)
@@ -173,9 +175,10 @@ class VisionEngine:
             return "Error loading P&ID images.", {}
 
         # 3. Build enhanced vision prompt
+        history_block = f"{history}\n\n" if history else ""
         prompt = f"""You are an expert P&ID (Piping and Instrumentation Diagram) analyst for oil and gas facilities.
 
-User question: {query}
+{history_block}User question: {query}
 
 ⚠️ CRITICAL ANTI-HALLUCINATION INSTRUCTIONS ⚠️
 

@@ -12,6 +12,9 @@ from pydantic import BaseModel, Field
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, description="User's natural-language question")
     top_k: int = Field(3, ge=1, le=10, description="Chunks to retrieve for RAG")
+    conversation_id: Optional[str] = Field(
+        None, description="Opt-in short-term memory: turns are stored/recalled per id"
+    )
 
 
 class Source(BaseModel):
@@ -43,6 +46,7 @@ class Telemetry(BaseModel):
     cost_usd: float
     model: str
     retrieval_mode: str
+    rewritten_query: Optional[str] = None   # set only when a follow-up was rewritten
 
 
 class QueryResponse(BaseModel):

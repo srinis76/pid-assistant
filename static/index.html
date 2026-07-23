@@ -148,6 +148,12 @@
   .rdtoggle{font-size:.72rem;color:var(--accent);cursor:pointer;margin-top:8px;user-select:none;display:none}
   body.tech .rdtoggle{display:inline-block}
   .fbthanks{font-size:.72rem;color:var(--green);margin-left:10px;white-space:nowrap}
+  /* resolved follow-up note — only shown in technical detail mode */
+  .rewrite-note{display:none;font-size:.74rem;color:var(--ink-2);background:var(--accent-soft);
+    border:1px solid #dbeafe;border-radius:8px;padding:7px 11px;margin-bottom:10px;line-height:1.5}
+  body.tech .rewrite-note{display:block}
+  .rewrite-note b{color:var(--accent-dark);font-weight:600}
+  .rewrite-note .rw{font-family:ui-monospace,Menlo,monospace}
   .rdetail{display:none;margin-top:8px;font-size:.74rem;color:var(--muted);font-family:ui-monospace,monospace;background:var(--surface);border-radius:8px;padding:8px 10px;line-height:1.7}
   .rdetail.open{display:block}
   .rdetail .rbar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:4px}
@@ -366,8 +372,10 @@ function appendAnswer(data){
   const drawing=(data.sources&&data.sources[0]&&data.sources[0].drawing)||'D-254-001';
   const img = data.image_url ? `<figure class="pidfig"><img src="${data.image_url}" alt="P&ID Sheet ${data.sheet||''}" loading="lazy"><figcaption>📐 Referenced diagram · Drawing ${drawing} · Sheet ${data.sheet||''}</figcaption></figure>`:'';
   const tk = data.ticket ? ticketHtml(data.ticket):'';
+  const rw = (data.telemetry&&data.telemetry.rewritten_query)
+    ? `<div class="rewrite-note">🧠 Follow-up resolved from conversation memory to: <b class="rw">${esc(data.telemetry.rewritten_query)}</b></div>`:'';
   document.getElementById('chat-inner').insertAdjacentHTML('beforeend',`<div class="msg"><div class="a-block">
-    <div class="a-text">${mdToHtml(data.answer)}</div>
+    ${rw}<div class="a-text">${mdToHtml(data.answer)}</div>
     ${img}${tk}
     <div class="meta">
       <button class="citebtn" onclick="this.classList.toggle('open');document.getElementById('src-${id}').classList.toggle('open');setTimeout(()=>{document.getElementById('chat').scrollTop=1e9},60)">
@@ -397,12 +405,14 @@ async function ask(text){
   const load=document.createElement('div'); load.className='msg';
   load.innerHTML='<div class="a-block"><div class="loading"><span></span><span></span><span></span></div></div>';
   inner.appendChild(load); document.getElementById('chat').scrollTop=1e9;
+  // Ensure the conversation exists BEFORE the request so the first turn is tagged.
+  ensureConvo();
   try{
-    const res=await fetch('/api/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:text})});
+    const res=await fetch('/api/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:text,conversation_id:String(current.id)})});
     if(!res.ok){const t=await res.text();throw new Error('HTTP '+res.status);}
     const data=await res.json();
     load.remove(); appendAnswer(data);
-    ensureConvo(); if(!current.title)current.title=text; current.items.push({q:esc(text),data}); persist(); renderHistory();
+    if(!current.title)current.title=text; current.items.push({q:esc(text),data}); persist(); renderHistory();
   }catch(e){
     load.remove();
     inner.insertAdjacentHTML('beforeend',`<div class="msg"><div class="a-block"><div class="a-text"><p>⚠️ Couldn't reach the assistant service (${esc(e.message)}). Make sure the API is running.</p></div></div></div>`);
