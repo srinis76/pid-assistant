@@ -255,3 +255,13 @@ def test_no_conversation_id_is_stateless(client):
     n = conn.execute("SELECT COUNT(*) FROM conversation_turns").fetchone()[0]
     conn.close()
     assert n == 0
+
+
+def test_index_is_served_no_cache(client):
+    """The SPA shell must not be stale-cached, or browsers keep running old JS
+    after a frontend change (this masked conversation memory during testing)."""
+    c, _ = client
+    r = c.get("/")
+    assert r.status_code == 200
+    cc = r.headers.get("cache-control", "").lower()
+    assert "no-cache" in cc or "no-store" in cc

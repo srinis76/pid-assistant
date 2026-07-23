@@ -112,7 +112,12 @@ def health():
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    # No-cache so a frontend change is never masked by a stale cached SPA shell
+    # (a cached old index.html omits conversation_id → memory silently inactive).
+    return FileResponse(
+        STATIC / "index.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @app.get("/api/pages/{page}")
